@@ -1,0 +1,194 @@
+# Prometheus告警规则 v3.0
+# 基于知识图谱最佳实践的Web图像处理应用告警配置
+
+groups:
+  # 系统资源告警
+  - name: system.rules
+    rules:
+      # CPU使用率过高
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "CPU使用率过高"
+          description: "实例 {{ $labels.instance }} CPU使用率已超过80%，当前值: {{ $value }}%"
+
+      # 内存使用率过高
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "内存使用率过高"
+          description: "实例 {{ $labels.instance }} 内存使用率已超过85%，当前值: {{ $value }}%"
+
+      # 磁盘空间不足
+      - alert: DiskSpaceLow
+        expr: (1 - (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"})) * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "磁盘空间不足"
+          description: "实例 {{ $labels.instance }} 磁盘 {{ $labels.mountpoint }} 使用率已超过90%，当前值: {{ $value }}%"
+
+      # 磁盘IO过高
+      - alert: HighDiskIO
+        expr: irate(node_disk_io_time_seconds_total[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "磁盘IO使用率过高"
+          description: "实例 {{ $labels.instance }} 磁盘IO使用率已超过80%，当前值: {{ $value }}%"
+
+  # 应用服务告警
+  - name: application.rules
+    rules:
+      # 服务不可用
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: application
+        annotations:
+          summary: "服务不可用"
+          description: "服务 {{ $labels.job }} 实例 {{ $labels.instance }} 已停止响应"
+
+      # HTTP错误率过高
+      - alert: HighErrorRate
+        expr: rate(nginx_http_requests_total{status=~"5.."}[5m]) / rate(nginx_http_requests_total[5m]) * 100 > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: application
+        annotations:
+          summary: "HTTP错误率过高"
+          description: "HTTP 5xx错误率已超过5%，当前值: {{ $value }}%"
+
+      # 响应时间过长
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(nginx_http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: application
+        annotations:
+          summary: "响应时间过长"
+          description: "95%的请求响应时间超过2秒，当前值: {{ $value }}秒"
+
+      # 请求量异常
+      - alert: UnusualRequestVolume
+        expr: rate(nginx_http_requests_total[5m]) > 1000 or rate(nginx_http_requests_total[5m]) < 1
+        for: 10m
+        labels:
+          severity: warning
+          service: application
+        annotations:
+          summary: "请求量异常"
+          description: "请求量异常，当前值: {{ $value }} req/s"
+
+  # 容器告警
+  - name: container.rules
+    rules:
+      # 容器重启频繁
+      - alert: ContainerRestartingFrequently
+        expr: increase(container_start_time_seconds[1h]) > 3
+        for: 5m
+        labels:
+          severity: warning
+          service: container
+        annotations:
+          summary: "容器重启频繁"
+          description: "容器 {{ $labels.name }} 在过去1小时内重启了 {{ $value }} 次"
+
+      # 容器内存使用率过高
+      - alert: ContainerHighMemoryUsage
+        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          service: container
+        annotations:
+          summary: "容器内存使用率过高"
+          description: "容器 {{ $labels.name }} 内存使用率已超过90%，当前值: {{ $value }}%"
+
+      # 容器CPU使用率过高
+      - alert: ContainerHighCPUUsage
+        expr: (rate(container_cpu_usage_seconds_total[5m]) / container_spec_cpu_quota * container_spec_cpu_period) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          service: container
+        annotations:
+          summary: "容器CPU使用率过高"
+          description: "容器 {{ $labels.name }} CPU使用率已超过90%，当前值: {{ $value }}%"
+
+  # Redis告警（如果使用Redis）
+  - name: redis.rules
+    rules:
+      # Redis连接数过多
+      - alert: RedisHighConnections
+        expr: redis_connected_clients > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis连接数过多"
+          description: "Redis连接数已超过100，当前值: {{ $value }}"
+
+      # Redis内存使用率过高
+      - alert: RedisHighMemoryUsage
+        expr: (redis_memory_used_bytes / redis_memory_max_bytes) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis内存使用率过高"
+          description: "Redis内存使用率已超过90%，当前值: {{ $value }}%"
+
+      # Redis主从同步延迟
+      - alert: RedisMasterSlaveReplicationLag
+        expr: redis_master_repl_offset - redis_slave_repl_offset > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis主从同步延迟"
+          description: "Redis主从同步延迟过大，当前延迟: {{ $value }} bytes"
+
+  # 网络告警
+  - name: network.rules
+    rules:
+      # 网络流量异常
+      - alert: UnusualNetworkTraffic
+        expr: rate(node_network_receive_bytes_total[5m]) > 100000000 or rate(node_network_transmit_bytes_total[5m]) > 100000000
+        for: 5m
+        labels:
+          severity: warning
+          service: network
+        annotations:
+          summary: "网络流量异常"
+          description: "网络接口 {{ $labels.device }} 流量异常，接收: {{ $value }} bytes/s"
+
+      # 网络错误率过高
+      - alert: HighNetworkErrors
+        expr: rate(node_network_receive_errs_total[5m]) > 10 or rate(node_network_transmit_errs_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: network
+        annotations:
+          summary: "网络错误率过高"
+          description: "网络接口 {{ $labels.device }} 错误率过高，当前值: {{ $value }} errors/s"

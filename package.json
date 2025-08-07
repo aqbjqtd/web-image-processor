@@ -1,0 +1,57 @@
+{
+  "name": "modern-image-processor",
+  "version": "2.0.0",
+  "description": "现代化智能图像批量处理工具 - 基于Vue.js 3和Quasar Framework",
+  "main": "index.js",
+  "scripts": {
+    "dev": "quasar dev",
+    "build": "quasar build",
+    "serve": "quasar serve",
+    "lint": "eslint --ext .js,.vue ./",
+    "format": "prettier --write \"**/*.{js,vue,json,css,scss,md}\"",
+    "test": "vitest",
+    "docker:build": "docker build -t web-image-processor .",
+    "docker:run": "docker run -p 8080:8080 web-image-processor",
+    "docker:compose": "docker-compose up -d",
+    "docker:compose:down": "docker-compose down",
+    "generate-sw": "workbox generateSW workbox-config.js"
+  },
+  "keywords": [
+    "image-processing",
+    "batch-processing",
+    "vue3",
+    "quasar",
+    "canvas",
+    "web-workers",
+    "modern-ui"
+  ],
+  "author": "现代图像处理工具开发团队",
+  "license": "MIT",
+  "dependencies": {
+    "@quasar/extras": "^1.16.9",
+    "context7": "^1.0.3",
+    "file-saver": "^2.0.5",
+    "idb": "^7.1.1",
+    "lodash-es": "^4.17.21",
+    "pinia": "^2.1.7",
+    "quasar": "^2.14.2",
+    "vue": "^3.4.15",
+    "vue-router": "^4.2.5",
+    "workbox-window": "^7.0.0"
+  },
+  "devDependencies": {
+    "@quasar/app-vite": "^1.7.3",
+    "@vitejs/plugin-vue": "^2.3.4",
+    "eslint": "^8.56.0",
+    "eslint-plugin-vue": "^9.20.1",
+    "prettier": "^3.2.4",
+    "vite": "^2.9.18",
+    "vitest": "^1.2.2",
+    "workbox-cli": "^7.0.0"
+  },
+  "engines": {
+    "node": ">= 18.0.0",
+    "npm": ">= 8.19.0",
+    "yarn": ">= 1.21.1"
+  }
+}

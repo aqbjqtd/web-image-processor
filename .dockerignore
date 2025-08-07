@@ -1,0 +1,36 @@
+# Git files
+.git
+.github
+
+# Node modules
+node_modules
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output
+dist
+dist-ssr
+
+# Prozess- und Systemdateien
+.quasar
+/src-capacitor
+/src-cordova
+/src-electron
+
+# IDE- und Editor-Dateien
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# CLAUDE.md (optional, je nach Projekt)
+CLAUDE.md
+
+# Andere
+.DS_Store

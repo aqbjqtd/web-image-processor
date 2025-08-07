@@ -33,7 +33,7 @@
 
 ```bash
 # 1. 克隆项目
-git clone <repository-url>
+git clone https://github.com/aqbjqtd/web-image-processor.git
 cd web-app
 
 # 2. 安装依赖

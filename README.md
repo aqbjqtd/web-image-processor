@@ -34,7 +34,7 @@
 ```bash
 # 1. 克隆项目
 git clone https://github.com/aqbjqtd/web-image-processor.git
-cd web-app
+cd web-image-processor
 
 # 2. 安装依赖
 npm install

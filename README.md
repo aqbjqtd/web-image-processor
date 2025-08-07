@@ -45,27 +45,18 @@ npm run dev
 
 ## 🐳 Docker 部署指南
 
-本项目已完全容器化，您可以通过Docker或Docker Compose轻松部署。在开始之前，请先将 `.env.example` 文件复制为 `.env`，并根据需要修改其中的配置。
+本项目已完全容器化，您可以通过Docker或Docker Compose轻松部署。
 
 ### 方法一：使用 Docker Compose (推荐)
 
 这是最简单、最推荐的部署方式。只需一条命令即可启动整个应用。
 
 ```bash
-# 基础部署（仅包含主应用）
+# 基础部署
 docker-compose up -d
-
-# 部署包含监控套件（Prometheus + Grafana）
-docker-compose --profile monitoring up -d
-
-# 部署包含Traefik反向代理
-docker-compose --profile traefik up -d
-
-# 部署完整应用（所有服务）
-docker-compose --profile monitoring --profile traefik up -d
 ```
 
-启动后，应用将运行在 `http://localhost:8080`。 Traefik 面板在 `http://localhost:8081`，Grafana 在 `http://localhost:3000`。
+启动后，应用将运行在 `http://localhost:59000`。
 
 **其他 `docker-compose` 命令:**
 
@@ -88,11 +79,25 @@ npm run docker:build
 **2. 运行Docker容器**
 
 ```bash
-# 将容器的8080端口映射到主机的8080端口
+# 将容器的8080端口映射到主机的59000端口
 npm run docker:run
 ```
 
-启动后，应用同样会运行在 `http://localhost:8080`。
+启动后，应用同样会运行在 `http://localhost:59000`。
+
+### 方法三：直接使用DockerHub镜像
+
+您也可以直接从DockerHub拉取预构建的镜像：
+
+```bash
+# 拉取最新版本镜像
+docker pull aqbjqtd/web-image-processor:latest
+
+# 运行容器
+docker run -d -p 59000:8080 --name web-image-processor aqbjqtd/web-image-processor:latest
+```
+
+访问地址：http://localhost:59000
 
 ## 📦 主要命令
 

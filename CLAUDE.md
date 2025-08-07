@@ -2,76 +2,149 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 🚀 Quick Start
+## 项目概述
 
-### Core Commands
+这是一个基于Vue.js 3和Quasar Framework构建的现代化Web图像处理工具，专注于客户端隐私保护和高性能处理。
 
-- **Start dev server**: `npm run dev` (runs on port 9000)
-- **Build for production**: `npm run build`
-- **Run tests**: `npm test`
-- **Lint & Format**: `npm run lint` and `npm run format`
+### 核心特性
+- 100%客户端处理，无任何数据上传
+- WebAssembly和Web Workers集成
+- PWA支持，可离线使用
+- 多格式图像处理（JPEG、PNG、WebP、AVIF等）
 
-### Docker Commands
+## 开发命令
 
-#### 快速部署（推荐）
-- **基础部署**: `docker compose up -d` (使用Docker Hub预构建镜像)
-- **停止服务**: `docker compose down`
+### 基础开发命令
+- `npm run dev` - 启动开发服务器（端口9000）
+- `npm run build` - 构建生产版本
+- `npm run serve` - 本地预览构建版本
 
-#### 开发环境（本地构建）
-- **开发部署**: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build`
-- **含监控**: `docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile monitoring up -d --build`
-- **含Traefik**: `docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile traefik up -d --build`
-- **完整环境**: `docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile traefik --profile monitoring --profile cache up -d --build`
+### 代码质量检查
+- `npm run lint` - ESLint代码检查
+- `npm run format` - Prettier代码格式化
+- `npm run test` - 运行单元测试（Vitest）
 
-#### 单容器命令
-- **Build image**: `npm run docker:build`
-- **Run container**: `npm run docker:run`
+### Docker部署
+- `npm run docker:build` - 构建Docker镜像
+- `npm run docker:run` - 运行Docker容器（端口59000）
+- `npm run docker:compose` - 使用docker-compose启动
+- `npm run docker:compose:down` - 停止docker-compose服务
 
-## 🔒 Privacy First Architecture
+### 进程清理命令
+- `npm run cleanup` - 清理指定端口的进程
+- `npm run cleanup:all` - 清理所有相关进程
+- `npm run cleanup:enhanced` - 增强清理功能
+- `npm run cleanup:enhanced-all` - 完整清理
 
-The application is designed to be **100% client-side**. All file reading and image processing happens directly in the user's browser. **No data or images are ever uploaded to any server.** The core technologies enabling this are:
+## 架构说明
 
-- **`FileReader` API**: Reads files from the user's local disk into the browser's memory.
-- **Canvas API & WebAssembly**: Perform all image manipulation tasks on the client-side.
-- **`URL.createObjectURL` / `canvas.toDataURL`**: Generate downloadable results without server interaction.
+### 前端框架
+- **Vue 3 Composition API** - 主要前端框架
+- **Quasar Framework** - UI组件库，提供Material Design界面
+- **Pinia** - 状态管理
+- **Vue Router** - 路由管理
 
-## 🛠️ Tech Stack & Architecture
+### 核心技术栈
+- **WebAssembly (WASM)** - 高性能图像处理
+- **Web Workers** - 多线程处理，避免UI阻塞  
+- **Canvas API** - 基础图像处理和渲染
+- **PWA技术** - Service Worker + Workbox实现离线功能
 
-- **Frontend**: Vue.js 3 (Composition API with `<script setup>`)
-- **UI Framework**: Quasar Framework 2.14.2
-- **Build Tool**: Vite
-- **Core Logic**: TypeScript for type safety and modern JavaScript features.
-- **State Management**: Pinia for centralized, type-safe state management.
-- **High-Performance Computing**: WebAssembly (WASM) for CPU-intensive tasks, with a fallback to Canvas API.
-- **Concurrency**: Web Workers (`imageWorker.js`) for non-blocking background processing.
-
-### Key Architectural Components
-
-1.  **`ImageProcessor.js` (`src/utils/`)**: A singleton class that orchestrates all image processing. It manages the processing pipeline, switching between WASM and Canvas, and handling batch operations. Features intelligent file size optimization using binary search algorithm.
-2.  **`WasmManager.js` (`src/utils/`)**: Manages the lifecycle of WebAssembly modules, including lazy loading, preloading high-priority modules, and memory management.
-3.  **`IndexPage.vue` (`src/pages/`)**: The main user interface. It is responsible for user interaction, managing the state of file uploads, displaying results, and providing file size limit configuration.
-4.  **`MainLayout.vue` (`src/layouts/`)**: The main application layout, providing a consistent header and structure.
-
-### Project Structure
-
+### 项目结构
 ```
 src/
-├── css/                 # Global styles
-├── layouts/             # Main application layout
-├── pages/               # Vue components for different routes (UI)
-│   └── IndexPage.vue    # The primary page for the application
-├── router/              # Vue Router configuration
-├── utils/               # Core application logic
-│   ├── ImageProcessor.js  # Main processing engine (singleton)
-│   └── WasmManager.js     # WASM module management
-└── workers/             # Web Worker scripts
-    └── imageWorker.js   # Background processing logic
+├── utils/
+│   ├── ImageProcessor.js    # 主要图像处理类，集成WASM和Canvas
+│   └── WasmManager.js      # WASM模块管理器
+├── workers/
+│   └── imageWorker.js      # Web Worker图像处理
+├── pages/
+│   └── IndexPage.vue       # 主页面，包含上传和处理界面
+├── layouts/
+│   └── MainLayout.vue      # 应用布局
+└── App.vue                 # 根组件
 ```
 
-## 📝 Development Notes
+### 核心组件说明
 
-- **UI Style**: The UI has been refactored to a modern, bright, and clean aesthetic. The main styles are located within the `<style scoped>` block of `IndexPage.vue`.
-- **Exit Signals**: `quasar.config.js` has a robust exit signal handler to ensure the dev server process is properly terminated, preventing port conflicts, especially on Windows.
-- **Singleton Pattern**: `ImageProcessor.js` is implemented as a singleton. Always import the instance directly (`import imageProcessor from '...'`) rather than creating a `new ImageProcessor()`.
-- **WASM Modules**: WASM files are located in the `public/wasm` directory and are loaded on demand by `WasmManager.js`.
-- **File Size Optimization**: The application includes an intelligent file size limiting feature that uses a binary search algorithm to find the optimal image quality that meets the specified file size requirement (default: 300KB, range: 50-5000KB).
+#### ImageProcessor.js (`src/utils/`)
+- 主要图像处理类，支持Canvas和WASM两种处理模式
+- 批量处理功能，支持并发处理
+- 智能质量优化，根据文件大小限制自动调整
+- 多种调整模式：拉伸、保持比例填充、保持比例裁剪
+
+#### WasmManager.js (`src/utils/`)  
+- 管理WebAssembly模块的加载、初始化和生命周期
+- 支持异步模块加载和内存管理
+- 错误处理和降级机制
+
+#### imageWorker.js (`src/workers/`)
+- 独立线程图像处理，避免阻塞主UI
+- 支持OffscreenCanvas和ImageData处理
+- 集成WASM支持和颜色调整功能
+
+### 配置文件
+
+#### quasar.config.js
+- 包含优雅退出处理机制，确保进程正确清理
+- PWA配置，支持Service Worker
+- Vite构建配置，包含WebAssembly优化
+- 开发服务器配置（默认端口9000）
+
+#### 进程管理
+项目集成了完善的进程清理机制：
+- 自动监听退出信号（SIGINT、SIGTERM等）
+- Windows特殊处理，支持控制台关闭事件
+- 超时强制退出，防止进程僵死
+- 清理脚本自动化处理
+
+## 开发注意事项
+
+### 隐私保护原则
+- 所有图像处理必须在客户端完成
+- 禁止添加任何网络上传功能
+- 确保FileReader API仅用于本地文件读取
+
+### 性能优化
+- 使用WebAssembly优先处理大图像
+- Web Workers用于批量处理
+- 图像质量智能调整，满足文件大小限制
+
+### 错误处理
+- 优雅降级：WASM失败时自动切换到Canvas
+- 完整的错误边界处理
+- 用户友好的错误提示
+
+### 测试和构建
+- 使用Vitest进行单元测试
+- ESLint + Prettier确保代码质量
+- Docker多阶段构建优化
+
+### PWA功能
+- Workbox Service Worker自动生成
+- 支持离线使用
+- 可安装到桌面
+
+## 常见问题
+
+### 开发服务器问题
+如果遇到端口占用，使用清理命令：`npm run cleanup:enhanced`
+
+### WASM模块加载失败
+系统会自动降级到Canvas处理，确保功能正常
+
+### 内存使用过高
+检查图像批量处理的并发数量，默认限制为4个并发
+
+### 容器启动问题
+如果Docker容器启动失败，请检查端口59000是否被占用
+
+### 部署访问地址
+- 开发环境：http://localhost:9000
+- Docker部署：http://localhost:59000
+- 健康检查：http://localhost:59000/health
+
+### DockerHub镜像
+项目镜像已推送至DockerHub：
+- 镜像名称：`aqbjqtd/web-image-processor:latest`
+- 直接使用：`docker pull aqbjqtd/web-image-processor:latest`

@@ -27,6 +27,14 @@
   ],
   "author": "现代图像处理工具开发团队",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aqbjqtd/web-image-processor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aqbjqtd/web-image-processor/issues"
+  },
+  "homepage": "https://github.com/aqbjqtd/web-image-processor#readme",
   "dependencies": {
     "@quasar/extras": "^1.16.9",
     "context7": "^1.0.3",

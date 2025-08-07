@@ -24,6 +24,11 @@
 
 ## 🚀 快速开始
 
+### 在线体验
+
+您可以直接访问该项目的GitHub主页，以获取最新的代码和文档：
+[https://github.com/aqbjqtd/web-image-processor](https://github.com/aqbjqtd/web-image-processor)
+
 ### 开发环境
 
 ```bash

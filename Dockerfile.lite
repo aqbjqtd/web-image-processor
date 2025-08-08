@@ -1,0 +1,63 @@
+# 低配VPS专用Docker镜像
+# 针对512MB-1GB内存的VPS优化
+# 镜像大小: ~50MB，运行时内存: ~32MB
+
+FROM nginx:1.26-alpine
+
+# 镜像标签信息
+LABEL maintainer="aqbjqtd" \
+      version="lite-3.0" \
+      description="Web图像处理工具 - 低配VPS专用版本" \
+      org.opencontainers.image.source="https://github.com/aqbjqtd/web-image-processor" \
+      org.opencontainers.image.title="Web Image Processor Lite" \
+      org.opencontainers.image.description="轻量级Web图像处理工具，专为低配VPS优化"
+
+# 设置工作环境
+ENV TZ=Asia/Shanghai \
+    NGINX_ENVSUBST_TEMPLATE_DIR=/etc/nginx/templates \
+    NGINX_ENVSUBST_TEMPLATE_SUFFIX=.template
+
+# 安装必要工具（最小化安装）
+RUN apk add --no-cache \
+    curl \
+    ca-certificates \
+    tzdata \
+    && rm -rf /var/cache/apk/* \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone
+
+# 创建nginx用户和必要目录
+RUN addgroup -S nginx-app && \
+    adduser -S -D -H -h /var/cache/nginx -s /sbin/nologin -G nginx-app nginx-app && \
+    mkdir -p /var/log/nginx /var/cache/nginx /tmp/nginx && \
+    touch /var/run/nginx.pid
+
+# 复制构建好的静态文件
+COPY dist/spa /usr/share/nginx/html
+
+# 复制优化的nginx配置
+COPY nginx-lite.conf /etc/nginx/nginx.conf
+
+# 创建健康检查页面
+RUN echo '{"status":"healthy","version":"lite-3.0","timestamp":"'$(date -Iseconds)'"}' > /usr/share/nginx/html/health.json
+
+# 设置文件权限
+RUN chown -R nginx-app:nginx-app /usr/share/nginx/html && \
+    chown -R nginx-app:nginx-app /var/log/nginx && \
+    chown -R nginx-app:nginx-app /var/cache/nginx && \
+    chown -R nginx-app:nginx-app /tmp/nginx && \
+    chown nginx-app:nginx-app /var/run/nginx.pid && \
+    chmod -R 755 /usr/share/nginx/html
+
+# 暴露端口
+EXPOSE 8080
+
+# 健康检查
+HEALTHCHECK --interval=60s --timeout=3s --start-period=10s --retries=2 \
+    CMD curl -f http://localhost:8080/health.json || exit 1
+
+# 切换到非root用户
+USER nginx-app
+
+# 启动命令
+CMD ["nginx", "-g", "daemon off;"]

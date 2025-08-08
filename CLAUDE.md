@@ -23,6 +23,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run lint` - ESLint代码检查
 - `npm run format` - Prettier代码格式化
 - `npm run test` - 运行单元测试（Vitest）
+- `npm run generate-sw` - 生成Service Worker文件
 
 ### Docker部署
 - `npm run docker:build` - 构建Docker镜像
@@ -148,3 +149,21 @@ src/
 项目镜像已推送至DockerHub：
 - 镜像名称：`aqbjqtd/web-image-processor:latest`
 - 直接使用：`docker pull aqbjqtd/web-image-processor:latest`
+
+## 系统要求
+
+- Node.js >= 18.0.0
+- npm >= 8.19.0 或 yarn >= 1.21.1
+- 支持WebAssembly的现代浏览器
+
+## 关键依赖
+
+### 核心框架
+- Vue 3.4.15 - 主要前端框架
+- Quasar 2.14.2 - UI组件库和构建工具
+- Pinia 2.1.7 - 状态管理
+
+### 图像处理相关
+- file-saver 2.0.5 - 文件下载功能
+- workbox-window 7.0.0 - PWA功能
+- idb 7.1.1 - IndexedDB操作

@@ -1,0 +1,45 @@
+# 低配VPS专用Docker Compose配置
+# 适用于512MB-1GB内存的VPS
+# 使用预构建静态文件，避免在VPS上构建
+
+services:
+  web-image-processor:
+    image: aqbjqtd/web-image-processor:latest  # 使用DockerHub预构建镜像
+    container_name: web-image-processor-lite
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-59000}:8080"
+    environment:
+      - TZ=${TZ:-Asia/Shanghai}
+    volumes:
+      - ./logs:/var/log/nginx:rw
+    networks:
+      - web-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 60s
+      timeout: 5s
+      retries: 2
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'      # 减少CPU限制
+          memory: 256M     # 大幅减少内存限制
+        reservations:
+          cpus: '0.1'
+          memory: 64M      # 减少保留内存
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=50m  # 减少tmpfs大小
+
+networks:
+  web-network:
+    driver: bridge
+
+# 使用说明：
+# 1. 确保使用DockerHub镜像：docker pull aqbjqtd/web-image-processor:latest
+# 2. 部署命令：docker-compose -f docker-compose.low-resource.yml up -d
+# 3. 适用于512MB-1GB内存的VPS
+# 4. 访问地址：http://your-vps-ip:59000

@@ -3,6 +3,7 @@ services:
     image: aqbjqtd/web-image-processor:latest
     container_name: web-image-processor
     restart: unless-stopped
+    # 此处网络我是为了适配1panel平台，你也可以改成其它
     networks:
       - 1panel-network
     ports:
@@ -16,6 +17,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+      
+# 此处网络我是为了适配1panel平台，你也可以改成其它
 networks:
   1panel-network:
     external: true

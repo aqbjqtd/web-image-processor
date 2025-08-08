@@ -4,7 +4,7 @@ services:
     container_name: web-image-processor
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "59000:80"
     environment:
       - TZ=Asia/Shanghai
     # 健康检查 - 简化版本，兼容性更好

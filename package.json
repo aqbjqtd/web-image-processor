@@ -9,29 +9,14 @@
     "serve": "quasar serve",
     "lint": "eslint --ext .js,.vue ./",
     "format": "prettier --write \"**/*.{js,vue,json,css,scss,md}\"",
-    "test": "vitest run",
-    "test:ui": "vitest --ui",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "test:basic": "node -e \"console.log('Node.js test environment OK')\"",
-    "docker:build": "docker build -t web-image-processor .",
-    "docker:run": "docker run -p 59000:8080 web-image-processor",
-    "docker:compose": "docker-compose up -d",
-    "docker:compose:down": "docker-compose down",
-    "generate-sw": "workbox generateSW workbox-config.js",
-    "cleanup": "node scripts/cleanup.js port 9000",
-    "cleanup:all": "node scripts/cleanup.js all",
-    "cleanup:enhanced": "node scripts/enhanced-cleanup.js full",
-    "cleanup:enhanced-all": "node scripts/enhanced-cleanup.js full --all"
+    "test": "vitest run"
   },
   "keywords": [
     "image-processing",
     "batch-processing",
     "vue3",
     "quasar",
-    "canvas",
-    "web-workers",
-    "modern-ui"
+    "canvas"
   ],
   "author": "现代图像处理工具开发团队",
   "license": "MIT",
@@ -45,29 +30,22 @@
   "homepage": "https://github.com/aqbjqtd/web-image-processor#readme",
   "dependencies": {
     "@quasar/extras": "^1.16.9",
-    "context7": "^1.0.3",
     "file-saver": "^2.0.5",
-    "idb": "^7.1.1",
-    "lodash-es": "^4.17.21",
     "pinia": "^2.1.7",
     "quasar": "^2.14.2",
     "vue": "^3.4.15",
-    "vue-router": "^4.2.5",
-    "workbox-window": "^7.0.0"
+    "vue-router": "^4.2.5"
   },
   "devDependencies": {
     "@quasar/app-vite": "^1.7.3",
     "@vitejs/plugin-vue": "^2.3.4",
-    "@vitest/ui": "^1.6.0",
     "@vue/test-utils": "^2.4.6",
     "eslint": "^8.56.0",
     "eslint-plugin-vue": "^9.20.1",
-    "happy-dom": "^14.12.3",
+    "happy-dom": "^18.0.1",
     "prettier": "^3.2.4",
     "vite": "^2.9.18",
-    "vitest": "^1.2.2",
-    "vitest-canvas-mock": "^0.3.3",
-    "workbox-cli": "^7.0.0"
+    "vitest": "^1.2.2"
   },
   "engines": {
     "node": ">= 18.0.0",

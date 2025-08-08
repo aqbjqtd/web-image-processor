@@ -1,27 +1,24 @@
-# 现代图像处理工具 v3.0
+# 轻量级图像处理工具 v3.0
 
-一款基于现代Web技术构建的高性能、注重隐私的客户端图像处理应用。
+一款基于现代Web技术构建的轻量级、注重隐私的客户端图像处理应用，专为低配置VPS环境优化。
 
 ## ✨ 功能特性
 
 - **纯客户端处理**: 所有图像处理均在您的浏览器中完成，**100%保护您的隐私**，无需上传任何文件。
-- **高性能处理**: 集成 **WebAssembly (WASM)** 和 **Web Workers**，实现接近本机的处理速度，UI流畅不卡顿。
+- **轻量级处理**: 基于HTML5 Canvas API的高效图像处理，内存友好，适合各种设备。
 - **现代化界面**: 采用基于Vue.js 3和Quasar Framework的现代化、响应式UI设计，美观易用。
-- **批量处理**: 支持一次性处理多张图片，并提供丰富的尺寸和格式调整选项。
+- **批量处理**: 支持一次性处理多张图片，串行处理模式确保稳定性。
 - **文件大小控制**: 智能的文件大小限制功能，可设置输出图片的最大文件大小（KB），自动优化图片质量以满足要求。
-- **PWA支持**: 可作为渐进式Web应用（PWA）安装到桌面，支持离线使用。
-- **多格式支持**: 支持JPEG, PNG, WebP, AVIF, GIF, BMP等多种主流图像格式。
+- **多格式支持**: 支持JPEG, PNG, WebP, GIF, BMP等多种主流图像格式。
+- **低配置友好**: 优化内存使用，适合512MB内存的低配置VPS环境。
 
 ## 🛠️ 技术栈
 
 - **前端框架**: Vue.js 3 + Quasar Framework
 - **构建工具**: Vite
-- **测试框架**: Vitest + Happy DOM
-- **高性能计算**: WebAssembly (WASM)
-- **多线程**: Web Workers
-- **PWA**: Service Worker + Workbox
-- **容器化**: Docker + Docker Compose
-- **反向代理**: Nginx
+- **测试框架**: Vitest
+- **图像处理**: HTML5 Canvas API
+- **文件处理**: FileReader API
 
 ## 🚀 快速开始
 
@@ -44,71 +41,16 @@ npm install
 npm run dev
 ```
 
-## 🐳 Docker 部署指南
-
-本项目已完全容器化，您可以通过Docker或Docker Compose轻松部署。
-
-### 方法一：使用 Docker Compose (推荐)
-
-这是最简单、最推荐的部署方式。只需一条命令即可启动整个应用。
-
-```bash
-# 基础部署
-docker-compose up -d
-```
-
-启动后，应用将运行在 `http://localhost:59000`。
-
-**其他 `docker-compose` 命令:**
-
-- `docker-compose down`: 停止并移除容器。
-- `docker-compose logs -f`: 查看实时日志。
-- `docker-compose pull`: 拉取最新镜像。
-- `docker-compose build`: 强制重新构建镜像。
-
-### 方法二：使用原生 Docker 命令
-
-如果您希望手动控制构建和运行过程，可以遵循以下步骤：
-
-**1. 构建Docker镜像**
-
-```bash
-# 在项目根目录下执行
-npm run docker:build
-```
-
-**2. 运行Docker容器**
-
-```bash
-# 将容器的8080端口映射到主机的59000端口
-npm run docker:run
-```
-
-启动后，应用同样会运行在 `http://localhost:59000`。
-
-### 方法三：直接使用DockerHub镜像
-
-您也可以直接从DockerHub拉取预构建的镜像：
-
-```bash
-# 拉取最新版本镜像
-docker pull aqbjqtd/web-image-processor:latest
-
-# 运行容器
-docker run -d -p 59000:8080 --name web-image-processor aqbjqtd/web-image-processor:latest
-```
-
-访问地址：http://localhost:59000
+开发服务器启动后，访问：http://localhost:9000
 
 ## 📦 主要命令
 
 - `npm run dev`: 启动开发服务器（端口9000）
 - `npm run build`: 构建生产版本
 - `npm run serve`: 本地预览构建版本
-- `npm test`: 运行单元测试（Vitest）
+- `npm run test`: 运行单元测试（Vitest）
 - `npm run lint`: ESLint代码检查
 - `npm run format`: Prettier代码格式化
-- `npm run cleanup:enhanced`: 清理进程和端口（Windows优化）
 
 ## 🔒 隐私与安全
 
@@ -118,9 +60,9 @@ docker run -d -p 59000:8080 --name web-image-processor aqbjqtd/web-image-process
 
 - **零网络通信**：代码中无任何上传API调用，无`fetch`/`XMLHttpRequest`等网络请求
 - **本地文件处理**：使用浏览器原生`FileReader API`直接读取本地文件到内存
-- **客户端计算**：所有图像处理通过HTML5 Canvas和WebAssembly在浏览器内存中完成
+- **客户端计算**：所有图像处理通过HTML5 Canvas在浏览器内存中完成
 - **安全下载**：处理结果通过`URL.createObjectURL()`生成本地下载链接，无任何服务器交互
-- **部署验证**：即使在VPS上部署，用户浏览器也仅下载静态资源，所有处理仍在本地进行
+- **轻量级架构**：简化的代码结构，易于审计和验证安全性
 
 ## 🤝 贡献指南
 

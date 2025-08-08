@@ -1,19 +1,15 @@
 /**
  * 现代化图片处理工具类 v3.0
- * 基于知识图谱中的现代Web技术栈最佳实践
- * 集成WebAssembly、Web Workers和Canvas API
- * 支持多种图片格式和高性能处理模式
+ * 基于Canvas API的轻量级图像处理
+ * 适用于最低配置VPS部署
+ * 支持多种图片格式和基础处理模式
  */
-import wasmManager from "./WasmManager.js";
 
 class ImageProcessor {
   constructor() {
     this.canvas = null;
     this.ctx = null;
-    this.worker = null;
-    this.wasmEnabled = false;
     this.initCanvas();
-    this.initializeEngines();
   }
 
   /**
@@ -23,23 +19,10 @@ class ImageProcessor {
     this.canvas = document.createElement("canvas");
     this.ctx = this.canvas.getContext("2d");
 
-    // 启用高质量渲染
-    this.ctx.imageSmoothingEnabled = true;
-    this.ctx.imageSmoothingQuality = "high";
-  }
-
-  /**
-   * 初始化WASM引擎
-   */
-  async initializeEngines() {
-    try {
-      // 初始化WASM管理器
-      await wasmManager.initialize();
-      this.wasmEnabled = true;
-      console.log("WebAssembly引擎已启用");
-    } catch (error) {
-      console.warn("WebAssembly引擎初始化失败:", error);
-      this.wasmEnabled = false;
+    // 启用高质量渲染（仅在支持的环境中）
+    if (this.ctx) {
+      this.ctx.imageSmoothingEnabled = true;
+      this.ctx.imageSmoothingQuality = "high";
     }
   }
 
@@ -52,17 +35,19 @@ class ImageProcessor {
   async processImage(file, config) {
     // 输入验证
     if (!file) {
-      throw new Error('文件不能为空');
+      throw new Error("文件不能为空");
     }
-    
+
     if (!this.isValidImageFile(file)) {
       throw new Error(`不支持的文件格式: ${file.type}`);
     }
-    
+
     if (!this.isValidFileSize(file)) {
-      throw new Error(`文件过大: ${Math.round(file.size / 1024 / 1024)}MB，最大支持50MB`);
+      throw new Error(
+        `文件过大: ${Math.round(file.size / 1024 / 1024)}MB，最大支持50MB`,
+      );
     }
-    
+
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
 
@@ -72,22 +57,11 @@ class ImageProcessor {
 
           img.onload = async () => {
             try {
-              // 根据配置选择处理方式
-              let processedImageData;
-
-              if (config.useWasm && this.wasmEnabled) {
-                processedImageData = await this.processImageWithWasm(
-                  img,
-                  config,
-                  file.name,
-                );
-              } else {
-                processedImageData = await this.processImageData(
-                  img,
-                  config,
-                  file.name,
-                );
-              }
+              const processedImageData = await this.processImageData(
+                img,
+                config,
+                file.name,
+              );
 
               resolve(processedImageData);
             } catch (error) {
@@ -111,171 +85,6 @@ class ImageProcessor {
 
       reader.readAsDataURL(file);
     });
-  }
-
-  /**
-   * 使用WASM引擎处理图片
-   * @param {HTMLImageElement} img - 图片元素
-   * @param {Object} config - 处理配置
-   * @param {string} fileName - 文件名
-   * @returns {Promise<Object>} 处理后的图片数据
-   */
-  async processImageWithWasm(img, config, fileName) {
-    try {
-      // 获取WASM图像处理模块
-      const wasmProcessor = await wasmManager.getModule("imageProcessor");
-
-      if (!wasmProcessor) {
-        throw new Error("WASM图像处理模块未加载");
-      }
-
-      // 设置画布尺寸
-      this.canvas.width = img.width;
-      this.canvas.height = img.height;
-      this.ctx.drawImage(img, 0, 0);
-
-      const imageData = this.ctx.getImageData(0, 0, img.width, img.height);
-
-      // 使用WASM进行高性能图像处理
-      const processedData = await wasmProcessor.processImage(imageData, config);
-
-      this.ctx.putImageData(processedData, 0, 0);
-
-      return this.canvasToResult(this.canvas, fileName, config);
-    } catch (error) {
-      console.error("WASM图像处理失败:", error);
-      // 降级到基础处理
-      return this.processImageData(img, config, fileName);
-    }
-  }
-
-  /**
-   * 应用基础处理（尺寸调整、质量压缩等）
-   * @param {HTMLCanvasElement} sourceCanvas - 源画布
-   * @param {Object} config - 处理配置
-   * @returns {Promise<HTMLCanvasElement>} 处理后的画布
-   */
-  async applyBasicProcessing(sourceCanvas, config) {
-    const tempCanvas = document.createElement("canvas");
-    const tempCtx = tempCanvas.getContext("2d");
-
-    // 计算目标尺寸
-    let { width, height } = this.calculateDimensions(
-      sourceCanvas.width,
-      sourceCanvas.height,
-      config,
-    );
-
-    tempCanvas.width = width;
-    tempCanvas.height = height;
-
-    // 启用高质量缩放
-    tempCtx.imageSmoothingEnabled = true;
-    tempCtx.imageSmoothingQuality = "high";
-
-    // 如果需要填充背景色
-    if (config.backgroundColor) {
-      tempCtx.fillStyle = config.backgroundColor;
-      tempCtx.fillRect(0, 0, width, height);
-    }
-
-    tempCtx.drawImage(sourceCanvas, 0, 0, width, height);
-
-    return tempCanvas;
-  }
-
-  /**
-   * 计算目标尺寸
-   * @param {number} originalWidth - 原始宽度
-   * @param {number} originalHeight - 原始高度
-   * @param {Object} config - 配置对象
-   * @returns {Object} 目标尺寸
-   */
-  calculateDimensions(originalWidth, originalHeight, config) {
-    let {
-      width,
-      height,
-      maxWidth,
-      maxHeight,
-      maintainAspectRatio = true,
-      scale,
-    } = config;
-
-    // 如果指定了缩放比例
-    if (scale && scale !== 1) {
-      return {
-        width: Math.round(originalWidth * scale),
-        height: Math.round(originalHeight * scale),
-      };
-    }
-
-    // 如果没有指定尺寸，返回原始尺寸
-    if (!width && !height && !maxWidth && !maxHeight) {
-      return { width: originalWidth, height: originalHeight };
-    }
-
-    const aspectRatio = originalWidth / originalHeight;
-
-    // 处理最大尺寸限制
-    if (maxWidth || maxHeight) {
-      let targetWidth = originalWidth;
-      let targetHeight = originalHeight;
-
-      if (maxWidth && originalWidth > maxWidth) {
-        targetWidth = maxWidth;
-        targetHeight = maintainAspectRatio
-          ? targetWidth / aspectRatio
-          : originalHeight;
-      }
-
-      if (maxHeight && targetHeight > maxHeight) {
-        targetHeight = maxHeight;
-        targetWidth = maintainAspectRatio
-          ? targetHeight * aspectRatio
-          : originalWidth;
-      }
-
-      width = targetWidth;
-      height = targetHeight;
-    }
-
-    // 处理指定尺寸
-    if (width && !height && maintainAspectRatio) {
-      height = width / aspectRatio;
-    } else if (height && !width && maintainAspectRatio) {
-      width = height * aspectRatio;
-    } else if (!width && !height) {
-      width = originalWidth;
-      height = originalHeight;
-    }
-
-    return {
-      width: Math.round(width || originalWidth),
-      height: Math.round(height || originalHeight),
-    };
-  }
-
-  /**
-   * 将画布转换为结果对象
-   * @param {HTMLCanvasElement} canvas - 画布
-   * @param {string} fileName - 文件名
-   * @param {Object} config - 处理配置
-   * @returns {Object} 结果对象
-   */
-  canvasToResult(canvas, fileName, config) {
-    const format = config.format || "image/jpeg";
-    const quality = config.quality || 0.9;
-
-    return {
-      canvas: canvas,
-      dataUrl: canvas.toDataURL(format, quality),
-      blob: new Promise((resolve) => canvas.toBlob(resolve, format, quality)),
-      fileName: this.generateFileName(fileName, config),
-      width: canvas.width,
-      height: canvas.height,
-      format: format,
-      quality: quality,
-    };
   }
 
   /**
@@ -545,16 +354,11 @@ class ImageProcessor {
    * @returns {string} 新文件名
    */
   generateFileName(originalName, config = {}) {
-    const { format, suffix = "_processed", useWasm } = config;
+    const { format, suffix = "_processed" } = config;
     const nameWithoutExt = originalName.replace(/\.[^/.]+$/, "");
 
     let extension = ".jpg"; // 默认扩展名
     let processingSuffix = suffix;
-
-    // 根据处理类型添加后缀
-    if (useWasm) {
-      processingSuffix += "_wasm";
-    }
 
     if (format) {
       switch (format) {
@@ -563,9 +367,6 @@ class ImageProcessor {
           break;
         case "image/webp":
           extension = ".webp";
-          break;
-        case "image/avif":
-          extension = ".avif";
           break;
         case "image/jpeg":
         default:
@@ -579,7 +380,7 @@ class ImageProcessor {
   }
 
   /**
-   * 批量处理图片
+   * 批量处理图片（简化版，仅支持串行处理）
    * @param {Array<File>} files - 文件数组
    * @param {Object} config - 处理配置
    * @param {Function} progressCallback - 进度回调
@@ -587,20 +388,8 @@ class ImageProcessor {
    */
   async batchProcessImages(files, config, progressCallback) {
     const results = [];
-    const total = files.length;
-    const concurrency = config.concurrency || 3; // 并发处理数量
 
-    // 如果启用并发处理
-    if (concurrency > 1 && total > 1) {
-      return this.batchProcessConcurrent(
-        files,
-        config,
-        progressCallback,
-        concurrency,
-      );
-    }
-
-    // 串行处理
+    // 串行处理以节约内存
     for (let i = 0; i < files.length; i++) {
       try {
         const result = await this.processImage(files[i], config);
@@ -635,92 +424,15 @@ class ImageProcessor {
   }
 
   /**
-   * 并发批量处理图片
-   * @param {Array<File>} files - 文件数组
-   * @param {Object} config - 处理配置
-   * @param {Function} progressCallback - 进度回调
-   * @param {number} concurrency - 并发数量
-   * @returns {Promise<Array>} 处理结果数组
-   */
-  async batchProcessConcurrent(files, config, progressCallback, concurrency) {
-    const results = new Array(files.length);
-    let completed = 0;
-    const total = files.length;
-
-    const processFile = async (file, index) => {
-      try {
-        const result = await this.processImage(file, config);
-        results[index] = {
-          success: true,
-          file: file,
-          result: result,
-          index: index,
-        };
-      } catch (error) {
-        results[index] = {
-          success: false,
-          file: file,
-          error: error.message,
-          index: index,
-        };
-      }
-
-      completed++;
-
-      // 调用进度回调
-      if (progressCallback) {
-        progressCallback({
-          processed: completed,
-          total: total,
-          progress: completed / total,
-          currentFile: file.name,
-          results: results.filter((r) => r !== undefined),
-        });
-      }
-    };
-
-    // 创建并发处理队列
-    const promises = [];
-    for (let i = 0; i < files.length; i += concurrency) {
-      const batch = [];
-      for (let j = i; j < Math.min(i + concurrency, files.length); j++) {
-        batch.push(processFile(files[j], j));
-      }
-      promises.push(Promise.all(batch));
-    }
-
-    await Promise.all(promises);
-    return results;
-  }
-
-  /**
    * 获取处理能力信息
    * @returns {Object} 能力信息
    */
   getCapabilities() {
     return {
-      wasmEnabled: this.wasmEnabled,
-      workerSupported: typeof Worker !== "undefined",
       canvasSupported: typeof HTMLCanvasElement !== "undefined",
-      webglSupported: this.checkWebGLSupport(),
-      supportedFormats: ["image/jpeg", "image/png", "image/webp", "image/avif"],
-      maxConcurrency: navigator.hardwareConcurrency || 4,
+      supportedFormats: ["image/jpeg", "image/png", "image/webp"],
+      maxConcurrency: 1, // 低配置环境仅支持单线程
     };
-  }
-
-  /**
-   * 检查WebGL支持
-   * @returns {boolean} 是否支持WebGL
-   */
-  checkWebGLSupport() {
-    try {
-      const canvas = document.createElement("canvas");
-      const gl =
-        canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
-      return !!gl;
-    } catch (e) {
-      return false;
-    }
   }
 
   /**
@@ -732,17 +444,12 @@ class ImageProcessor {
       jsHeapSizeLimit: 0,
       totalJSHeapSize: 0,
       usedJSHeapSize: 0,
-      wasmMemory: 0,
     };
 
     if (performance.memory) {
       usage.jsHeapSizeLimit = performance.memory.jsHeapSizeLimit;
       usage.totalJSHeapSize = performance.memory.totalJSHeapSize;
       usage.usedJSHeapSize = performance.memory.usedJSHeapSize;
-    }
-
-    if (this.wasmEnabled) {
-      usage.wasmMemory = wasmManager.getMemoryUsage();
     }
 
     return usage;
@@ -762,12 +469,6 @@ class ImageProcessor {
       testCtx.fillStyle = "#ff0000";
       testCtx.fillRect(0, 0, 100, 100);
 
-      // 测试基础处理
-      const testConfig = { width: 50, height: 50, quality: 0.8 };
-      await this.applyBasicProcessing(testCanvas, testConfig);
-
-      // AI功能已移除，跳过AI引擎预热
-
       console.log("图像处理引擎预热完成");
     } catch (error) {
       console.warn("图像处理引擎预热失败:", error);
@@ -779,22 +480,9 @@ class ImageProcessor {
    */
   async cleanup() {
     try {
-      if (this.worker) {
-        this.worker.terminate();
-        this.worker = null;
-      }
-
       if (this.canvas) {
         this.canvas = null;
         this.ctx = null;
-      }
-
-      this.aiEnabled = false;
-
-      // 清理WASM模块
-      if (this.wasmEnabled) {
-        await wasmManager.cleanup();
-        this.wasmEnabled = false;
       }
 
       console.log("图像处理器资源已清理");
@@ -810,7 +498,6 @@ class ImageProcessor {
   async reinitialize() {
     await this.cleanup();
     this.initCanvas();
-    await this.initializeEngines();
     await this.warmup();
   }
 
@@ -821,15 +508,14 @@ class ImageProcessor {
    */
   isValidImageFile(file) {
     const supportedTypes = [
-      'image/jpeg',
-      'image/jpg', 
-      'image/png',
-      'image/webp',
-      'image/avif',
-      'image/gif',
-      'image/bmp'
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+      "image/bmp",
     ];
-    
+
     return supportedTypes.includes(file.type.toLowerCase());
   }
 
@@ -839,7 +525,8 @@ class ImageProcessor {
    * @param {number} maxSize - 最大大小（字节）
    * @returns {boolean} 是否在大小限制内
    */
-  isValidFileSize(file, maxSize = 50 * 1024 * 1024) { // 默认50MB
+  isValidFileSize(file, maxSize = 50 * 1024 * 1024) {
+    // 默认50MB
     return file.size <= maxSize;
   }
 
@@ -850,12 +537,19 @@ class ImageProcessor {
    * @returns {boolean} 是否在尺寸限制内
    */
   isValidImageDimensions(img, limits = {}) {
-    const { maxWidth = 8192, maxHeight = 8192, minWidth = 1, minHeight = 1 } = limits;
-    
-    return img.width >= minWidth && 
-           img.height >= minHeight && 
-           img.width <= maxWidth && 
-           img.height <= maxHeight;
+    const {
+      maxWidth = 8192,
+      maxHeight = 8192,
+      minWidth = 1,
+      minHeight = 1,
+    } = limits;
+
+    return (
+      img.width >= minWidth &&
+      img.height >= minHeight &&
+      img.width <= maxWidth &&
+      img.height <= maxHeight
+    );
   }
 
   /**

@@ -159,11 +159,11 @@ src/
 ## 关键依赖
 
 ### 核心框架
-- Vue 3.4.15 - 主要前端框架
-- Quasar 2.14.2 - UI组件库和构建工具
-- Pinia 2.1.7 - 状态管理
+- Vue 3.5.18 - 主要前端框架
+- Quasar 2.18.2 - UI组件库和构建工具
+- Pinia 2.3.1 - 状态管理
 
 ### 图像处理相关
 - file-saver 2.0.5 - 文件下载功能
-- workbox-window 7.0.0 - PWA功能
+- workbox-window 7.3.0 - PWA功能
 - idb 7.1.1 - IndexedDB操作

@@ -50,6 +50,19 @@ class ImageProcessor {
    * @returns {Promise<Object>} 处理后的图片数据
    */
   async processImage(file, config) {
+    // 输入验证
+    if (!file) {
+      throw new Error('文件不能为空');
+    }
+    
+    if (!this.isValidImageFile(file)) {
+      throw new Error(`不支持的文件格式: ${file.type}`);
+    }
+    
+    if (!this.isValidFileSize(file)) {
+      throw new Error(`文件过大: ${Math.round(file.size / 1024 / 1024)}MB，最大支持50MB`);
+    }
+    
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
 
@@ -799,6 +812,50 @@ class ImageProcessor {
     this.initCanvas();
     await this.initializeEngines();
     await this.warmup();
+  }
+
+  /**
+   * 验证图片文件类型
+   * @param {File} file - 文件对象
+   * @returns {boolean} 是否为有效的图片文件
+   */
+  isValidImageFile(file) {
+    const supportedTypes = [
+      'image/jpeg',
+      'image/jpg', 
+      'image/png',
+      'image/webp',
+      'image/avif',
+      'image/gif',
+      'image/bmp'
+    ];
+    
+    return supportedTypes.includes(file.type.toLowerCase());
+  }
+
+  /**
+   * 验证文件大小
+   * @param {File} file - 文件对象
+   * @param {number} maxSize - 最大大小（字节）
+   * @returns {boolean} 是否在大小限制内
+   */
+  isValidFileSize(file, maxSize = 50 * 1024 * 1024) { // 默认50MB
+    return file.size <= maxSize;
+  }
+
+  /**
+   * 验证图片尺寸
+   * @param {HTMLImageElement} img - 图片元素
+   * @param {Object} limits - 尺寸限制
+   * @returns {boolean} 是否在尺寸限制内
+   */
+  isValidImageDimensions(img, limits = {}) {
+    const { maxWidth = 8192, maxHeight = 8192, minWidth = 1, minHeight = 1 } = limits;
+    
+    return img.width >= minWidth && 
+           img.height >= minHeight && 
+           img.width <= maxWidth && 
+           img.height <= maxHeight;
   }
 
   /**

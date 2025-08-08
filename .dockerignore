@@ -1,26 +1,12 @@
-# 轻量镜像专用.dockerignore
-# 只排除不必要的文件，保留构建产物
+# .dockerignore for Docker build
+# 只排除真正不需要的文件，保留构建必需的文件
 
 # Git files
 .git
 .github
 
-# Node modules (构建时不需要)
+# Node modules (会通过依赖管理重新安装)
 node_modules
-
-# 源码文件（已经构建完成）
-src
-src-pwa
-
-# 开发工具配置
-.quasar
-quasar.config.js
-
-# 其他构建输出（保留dist/spa）
-dist-ssr
-/src-capacitor
-/src-cordova  
-/src-electron
 
 # 日志文件
 npm-debug.log*
@@ -41,18 +27,20 @@ logs
 .DS_Store
 Thumbs.db
 
-# 文档和脚本（镜像中不需要）
+# 测试相关
+tests
+.coverage
+
+# 文档和不必要的脚本
 README*.md
 CLAUDE.md
-*.sh
-scripts
+deploy-vps.sh
 
-# 开发依赖文件
-package*.json
-yarn.lock
-.eslintrc*
-.prettierrc*
-vitest.config.*
+# 其他构建输出（保留需要的dist/spa）
+dist-ssr
+/src-capacitor
+/src-cordova  
+/src-electron
 
 # Docker相关（避免递归）
 Dockerfile*

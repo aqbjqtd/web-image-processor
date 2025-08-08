@@ -16,6 +16,7 @@
 
 - **前端框架**: Vue.js 3 + Quasar Framework
 - **构建工具**: Vite
+- **测试框架**: Vitest + Happy DOM
 - **高性能计算**: WebAssembly (WASM)
 - **多线程**: Web Workers
 - **PWA**: Service Worker + Workbox
@@ -101,11 +102,13 @@ docker run -d -p 59000:8080 --name web-image-processor aqbjqtd/web-image-process
 
 ## 📦 主要命令
 
-- `npm run dev`: 启动开发服务器
+- `npm run dev`: 启动开发服务器（端口9000）
 - `npm run build`: 构建生产版本
-- `npm test`: 运行单元测试
-- `npm run lint`: 代码风格检查
-- `npm run format`: 代码格式化
+- `npm run serve`: 本地预览构建版本
+- `npm test`: 运行单元测试（Vitest）
+- `npm run lint`: ESLint代码检查
+- `npm run format`: Prettier代码格式化
+- `npm run cleanup:enhanced`: 清理进程和端口（Windows优化）
 
 ## 🔒 隐私与安全
 

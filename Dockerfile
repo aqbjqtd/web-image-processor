@@ -89,10 +89,6 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
-# 添加启动脚本
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
-
 # 切换到非root用户
 USER nginx-user
 
@@ -103,5 +99,4 @@ LABEL maintainer="Web Image Processing App" \
       org.opencontainers.image.source="https://github.com/your-repo/web-image-processor"
 
 # 启动应用
-ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]

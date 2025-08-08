@@ -281,32 +281,35 @@
   </q-page>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from "vue";
 import { useQuasar } from "quasar";
-import imageProcessor from "../utils/ImageProcessor.js";
+import imageProcessor from "../utils/ImageProcessor.ts";
+import type { ProcessedImage } from "../utils/ImageProcessor.ts";
 
 const $q = useQuasar();
 
 // 响应式数据
-const fileList = ref([]);
-const processing = ref(false);
-const progress = ref(0);
-const processedCount = ref(0);
-const totalCount = ref(0);
-const processedImages = ref([]);
-const showPreview = ref(false);
-const previewImageData = ref(null);
-const isDragOver = ref(false);
-const fileInput = ref(null);
+const fileList = ref<File[]>([]);
+const processing = ref<boolean>(false);
+const progress = ref<number>(0);
+const processedCount = ref<number>(0);
+const totalCount = ref<number>(0);
+const processedImages = ref<ProcessedImage[]>([]);
+const showPreview = ref<boolean>(false);
+const previewImageData = ref<ProcessedImage | null>(null);
+const isDragOver = ref<boolean>(false);
+const fileInput = ref<HTMLInputElement | null>(null);
 
 // 配置选项
-const targetWidth = ref(800);
-const targetHeight = ref(600);
-const resizeOption = ref("custom"); // custom, original, percentage
-const resizePercentage = ref(80);
-const resizeMode = ref("keep_ratio_pad");
-const maxFileSize = ref(300); // 文件大小限制(KB)
+const targetWidth = ref<number>(800);
+const targetHeight = ref<number>(600);
+const resizeOption = ref<"custom" | "original" | "percentage">("custom");
+const resizePercentage = ref<number>(80);
+const resizeMode = ref<"keep_ratio_pad" | "keep_ratio_crop" | "stretch">(
+  "keep_ratio_pad",
+);
+const maxFileSize = ref<number>(300);
 
 const resizeModeOptions = [
   { label: "保持比例填充", value: "keep_ratio_pad" },
@@ -320,16 +323,16 @@ const resizeModeOptions = [
 // const imageProcessor = new ImageProcessor()
 
 // 文件操作函数
-const triggerFileSelect = () => {
+const triggerFileSelect = (): void => {
   fileInput.value.click();
 };
 
-const onFileInputChange = (event) => {
+const onFileInputChange = (event: Event): void => {
   const files = Array.from(event.target.files);
   addFiles(files);
 };
 
-const addFiles = (files) => {
+const addFiles = (files: File[]): void => {
   const imageFiles = files.filter((file) =>
     /\.(jpg|jpeg|png|bmp|gif|webp)$/i.test(file.name),
   );
@@ -348,24 +351,24 @@ const addFiles = (files) => {
   }
 };
 
-const onDrop = (event) => {
+const onDrop = (event: DragEvent): void => {
   event.preventDefault();
   isDragOver.value = false;
   const files = Array.from(event.dataTransfer.files);
   addFiles(files);
 };
 
-const onDragOver = (event) => {
+const onDragOver = (event: DragEvent): void => {
   event.preventDefault();
   isDragOver.value = true;
 };
 
-const onDragLeave = (event) => {
+const onDragLeave = (event: DragEvent): void => {
   event.preventDefault();
   isDragOver.value = false;
 };
 
-const selectFolder = () => {
+const selectFolder = (): void => {
   const input = document.createElement("input");
   input.type = "file";
   input.webkitdirectory = true;
@@ -381,7 +384,7 @@ const selectFolder = () => {
 };
 
 // 处理函数
-const startProcessing = async () => {
+const startProcessing = async (): Promise<void> => {
   if (fileList.value.length === 0) {
     $q.notify({
       type: "warning",
@@ -442,7 +445,7 @@ const startProcessing = async () => {
   }
 };
 
-const stopProcessing = () => {
+const stopProcessing = (): void => {
   processing.value = false;
   $q.notify({
     type: "info",
@@ -453,12 +456,12 @@ const stopProcessing = () => {
 };
 
 // 预览和下载函数
-const previewImage = (image) => {
+const previewImage = (image: ProcessedImage): void => {
   previewImageData.value = image;
   showPreview.value = true;
 };
 
-const downloadSingle = (image) => {
+const downloadSingle = (image: ProcessedImage): void => {
   if (!image || !image.dataUrl) {
     $q.notify({
       type: "warning",
@@ -485,7 +488,7 @@ const downloadSingle = (image) => {
   });
 };
 
-const downloadAll = () => {
+const downloadAll = (): void => {
   if (processedImages.value.length === 0) {
     $q.notify({
       type: "warning",
@@ -510,7 +513,7 @@ const downloadAll = () => {
   });
 };
 
-const removeProcessedImage = (index) => {
+const removeProcessedImage = (index: number): void => {
   processedImages.value.splice(index, 1);
   $q.notify({
     type: "info",
@@ -520,7 +523,7 @@ const removeProcessedImage = (index) => {
   });
 };
 
-const clearProcessedImages = () => {
+const clearProcessedImages = (): void => {
   processedImages.value = [];
   $q.notify({
     type: "info",
@@ -531,14 +534,14 @@ const clearProcessedImages = () => {
 };
 
 // 工具函数
-const getTotalSize = () => {
+const getTotalSize = (): number => {
   if (processedImages.value.length === 0) return 0;
   return processedImages.value.reduce((total, image) => {
     return total + (image.processedSize ? image.processedSize.fileSize : 0);
   }, 0);
 };
 
-const formatFileSize = (bytes) => {
+const formatFileSize = (bytes: number): string => {
   if (bytes === 0) return "0 Bytes";
   const k = 1024;
   const sizes = ["Bytes", "KB", "MB", "GB"];
@@ -546,7 +549,7 @@ const formatFileSize = (bytes) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 };
 
-const getFileFormat = (filename) => {
+const getFileFormat = (filename: string): string => {
   const ext = filename.split(".").pop().toUpperCase();
   return ext === "JPG" ? "JPEG" : ext;
 };

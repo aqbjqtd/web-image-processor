@@ -17,18 +17,21 @@
 ## 🛠️ 技术栈
 
 ### 核心框架
+
 - **Vue.js 3.5.18**: 组合式API，响应式前端框架
 - **Quasar Framework 2.18.2**: Material Design UI组件库
 - **TypeScript 5.9.2**: 类型安全开发
 - **Pinia 2.3.1**: 现代状态管理
 
 ### 构建和工具
+
 - **Vite 2.9.18**: 快速构建工具
 - **Vitest 1.6.1**: 现代测试框架
 - **ESLint 8.57.1**: 代码检查
 - **Prettier 3.6.2**: 代码格式化
 
 ### 图像处理
+
 - **HTML5 Canvas API**: 轻量级图像处理和渲染
 - **FileReader API**: 本地文件读取
 - **文件保存**: file-saver库支持
@@ -54,7 +57,7 @@ npm install
 npm run dev
 ```
 
-开发服务器启动后，访问：http://localhost:9000
+开发服务器启动后，访问：<http://localhost:9000>
 
 ### Docker部署
 
@@ -67,30 +70,35 @@ docker build -t web-image-processor .
 docker run -d -p 9000:80 --name image-processor web-image-processor
 ```
 
-部署后访问：http://localhost:9000
+部署后访问：<http://localhost:9000>
 
 ## 📦 主要命令
 
 ### 开发命令
+
 - `npm run dev`: 启动开发服务器（端口9000）
+
 - `npm run build`: 构建生产版本
 - `npm run serve`: 本地预览构建版本
 
 ### 代码质量
+
 - `npm run test`: 运行单元测试（Vitest）
 - `npm run lint`: ESLint代码检查
+
 - `npm run format`: Prettier代码格式化
 - `npm audit`: 安全漏洞检查
 - `npm outdated`: 依赖更新检查
 
 ### Docker命令
+
 - `docker-compose up -d`: 启动容器服务
 - `docker-compose down`: 停止并删除容器
 - `docker-compose logs`: 查看容器日志
 
 ## 🏗️ 项目结构
 
-```
+```tree
 src/
 ├── utils/
 │   ├── ImageProcessor.ts    # 核心图像处理类（TypeScript）
@@ -104,18 +112,21 @@ src/
 ├── types/
 │   └── vue-shim.d.ts       # TypeScript声明文件
 └── workers/
+
     └── imageWorker.ts      # 图像处理Web Worker
 ```
 
 ## 🔧 核心功能
 
 ### 图像处理引擎
+
 - **智能压缩算法**: 基于图像复杂度分析的质量优化
 - **多种调整模式**: 拉伸、保持比例填充、保持比例裁剪
 - **内存管理**: 串行处理模式，避免内存溢出
 - **格式优化**: 自动选择最佳图像格式
 
 ### 用户界面
+
 - **响应式设计**: 适配桌面端和移动端
 - **Material Design**: 现代化的UI设计风格
 - **实时预览**: 处理进度和结果实时显示
@@ -137,7 +148,9 @@ src/
 ## 🧪 测试覆盖
 
 项目包含完整的测试套件：
+
 - **单元测试**: ImageProcessor核心功能测试
+
 - **类型检查**: TypeScript严格模式验证
 - **代码检查**: ESLint规则验证
 - **构建测试**: 生产环境构建验证
@@ -147,12 +160,15 @@ src/
 ## 🚀 部署方案
 
 ### 1Panel平台部署
+
 项目已适配1Panel平台，支持一键部署到VPS服务器。
 
 ### 传统VPS部署
+
 适合512MB内存的低配置服务器，使用Nginx作为Web服务器。
 
 ### 容器化部署
+
 Docker和Docker Compose支持，适合现代容器化部署环境。
 
 ## 📊 性能特性
@@ -173,6 +189,7 @@ Docker和Docker Compose支持，适合现代容器化部署环境。
 5. 提交Pull Request
 
 ### 开发规范
+
 - 使用TypeScript编写新功能
 - 遵循ESLint和Prettier代码规范
 - 为新功能添加单元测试

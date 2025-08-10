@@ -65,10 +65,8 @@ dist/
 .claude/
 CLAUDE.md
 
-
 # data
 data/
 
 # Editor directories and files
 .vscode/
-CLAUDE.md

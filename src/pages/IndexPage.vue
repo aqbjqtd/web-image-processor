@@ -4,27 +4,43 @@
     <div class="page-header">
       <h1 class="page-title">现代图像处理工具</h1>
       <p class="page-subtitle">高效、智能的批量图像处理解决方案</p>
+      
+      <!-- 隐私保护说明 -->
+      <div class="privacy-section">
+        <h3 class="privacy-title">隐私保护承诺</h3>
+        <div class="privacy-grid">
+          <div class="privacy-item">
+            <q-icon name="cloud_off" class="privacy-icon" />
+            <div class="privacy-text">
+              <div class="privacy-label">本地处理</div>
+              <div class="privacy-desc">图片仅在本地浏览器处理</div>
+            </div>
+          </div>
+          <div class="privacy-item">
+            <q-icon name="block" class="privacy-icon" />
+            <div class="privacy-text">
+              <div class="privacy-label">零上传</div>
+              <div class="privacy-desc">不会上传任何图片到服务器</div>
+            </div>
+          </div>
+          <div class="privacy-item">
+            <q-icon name="delete" class="privacy-icon" />
+            <div class="privacy-text">
+              <div class="privacy-label">即时清理</div>
+              <div class="privacy-desc">处理完成后自动清理内存</div>
+            </div>
+          </div>
+          <div class="privacy-item">
+            <q-icon name="security" class="privacy-icon" />
+            <div class="privacy-text">
+              <div class="privacy-label">数据安全</div>
+              <div class="privacy-desc">所有数据仅存在于您的设备</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- 统计信息 -->
-    <div class="stats-section">
-      <q-card flat class="stat-card">
-        <div class="stat-number">{{ processedCount }}</div>
-        <div class="stat-label">已处理</div>
-      </q-card>
-      <q-card flat class="stat-card">
-        <div class="stat-number">{{ fileList.length }}</div>
-        <div class="stat-label">待处理</div>
-      </q-card>
-      <q-card flat class="stat-card">
-        <div class="stat-number">{{ formatFileSize(getTotalSize()) }}</div>
-        <div class="stat-label">总大小</div>
-      </q-card>
-      <q-card flat class="stat-card">
-        <div class="stat-number">{{ Math.round(progress * 100) }}%</div>
-        <div class="stat-label">进度</div>
-      </q-card>
-    </div>
 
     <!-- 主要内容 -->
     <div class="main-content">
@@ -255,6 +271,26 @@
           <div class="empty-text">暂无处理完成的文件</div>
           <div class="empty-hint">处理结果将在这里显示</div>
         </div>
+      </q-card>
+    </div>
+
+    <!-- 统计信息 -->
+    <div class="stats-section">
+      <q-card flat class="stat-card">
+        <div class="stat-number">{{ processedCount }}</div>
+        <div class="stat-label">已处理</div>
+      </q-card>
+      <q-card flat class="stat-card">
+        <div class="stat-number">{{ fileList.length }}</div>
+        <div class="stat-label">待处理</div>
+      </q-card>
+      <q-card flat class="stat-card">
+        <div class="stat-number">{{ formatFileSize(getTotalSize()) }}</div>
+        <div class="stat-label">总大小</div>
+      </q-card>
+      <q-card flat class="stat-card">
+        <div class="stat-number">{{ Math.round(progress * 100) }}%</div>
+        <div class="stat-label">进度</div>
       </q-card>
     </div>
 
@@ -614,6 +650,59 @@ onBeforeUnmount(async () => {
   font-size: 1.2rem;
   opacity: 0.9;
   margin-top: 8px;
+  margin-bottom: 24px;
+}
+
+.privacy-section {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 24px;
+}
+
+.privacy-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: white;
+  margin: 0 0 16px 0;
+  text-align: center;
+}
+
+.privacy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.privacy-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.privacy-icon {
+  font-size: 1.4rem;
+  color: #4caf50;
+}
+
+.privacy-text {
+  flex: 1;
+}
+
+.privacy-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 2px;
+}
+
+.privacy-desc {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.2;
 }
 
 .stats-section {
@@ -655,7 +744,7 @@ onBeforeUnmount(async () => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 24px;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 .content-panel {

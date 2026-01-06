@@ -1,6 +1,8 @@
-node_modules/
-dist/
-.quasar/
-public/
-data/
+node_modules
+dist
+build
+coverage
 *.min.js
+*.config.js
+.next
+.nuxt

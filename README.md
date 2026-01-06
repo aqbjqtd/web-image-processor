@@ -1,4 +1,4 @@
-# 轻量级图像处理工具 v3.0
+# 轻量级图像处理工具 v1.0
 
 一款基于现代Web技术构建的轻量级、注重隐私的客户端图像处理应用，专为低配置VPS环境优化。
 
@@ -89,6 +89,28 @@ docker run -d -p 9000:80 --name image-processor web-image-processor
 - `npm run format`: Prettier代码格式化
 - `npm audit`: 安全漏洞检查
 - `npm outdated`: 依赖更新检查
+
+### 版本管理
+
+项目采用 **VERSION.txt 作为主版本源** 的版本管理方案，所有版本号变更通过 VERSION.txt 统一管理：
+
+- `npm run version:sync`: 同步 VERSION.txt 到 package.json
+- `npm run version:patch`: 升级补丁版本（例如：1.0.0 → 1.0.1）
+- `npm run version:minor`: 升级次版本（例如：1.0.0 → 1.1.0）
+- `npm run version:major`: 升级主版本（例如：1.0.0 → 2.0.0）
+
+**版本管理最佳实践**：
+
+1. **修改版本号**：直接编辑 `VERSION.txt` 文件
+2. **同步到 package.json**：运行 `npm run version:sync`
+3. **自动升级版本**：使用 `npm run version:patch/minor/major`
+4. **提交到 Git**：确保 `VERSION.txt` 和 `package.json` 同时提交
+
+**版本号格式**：遵循 [Semantic Versioning 2.0.0](https://semver.org/) 规范
+- 格式：`MAJOR.MINOR.PATCH`（例如：1.0.0）
+- MAJOR：不兼容的 API 修改
+- MINOR：向下兼容的功能新增
+- PATCH：向下兼容的 Bug 修复
 
 ### Docker命令
 
@@ -202,6 +224,10 @@ Docker和Docker Compose支持，适合现代容器化部署环境。
 ## 🔗 相关链接
 
 - [部署文档](DEPLOY.md)
-- [项目指导](CLAUDE.md)
+- [项目状态](CLAUDE_STATUS.md)
+- [性能指标](CLAUDE_PERFORMANCE.md)
+- [错误日志](CLAUDE_ERROR_LOG.md)
+- [技术决策](CLAUDE_DECISIONS.md)
+- [开发指导](CLAUDE.md)
 - [GitHub仓库](https://github.com/aqbjqtd/web-image-processor)
 - [问题反馈](https://github.com/aqbjqtd/web-image-processor/issues)

@@ -1,15 +1,20 @@
 {
   "name": "modern-image-processor",
-  "version": "3.0.0",
+  "version": "1.0.0",
   "description": "现代化智能图像批量处理工具 - 基于Vue.js 3和Quasar Framework",
   "main": "index.js",
   "scripts": {
     "dev": "quasar dev",
     "build": "quasar build",
     "serve": "quasar serve",
-    "lint": "eslint --ext .js,.vue ./",
+    "lint": "eslint . --ext .ts,.tsx,.js,.jsx,.vue",
     "format": "prettier --write \"**/*.{js,vue,json,css,scss,md}\"",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx,.vue --fix",
+    "version:sync": "node scripts/sync-version.js",
+    "version:patch": "node scripts/sync-version.js bump patch",
+    "version:minor": "node scripts/sync-version.js bump minor",
+    "version:major": "node scripts/sync-version.js bump major"
   },
   "keywords": [
     "image-processing",

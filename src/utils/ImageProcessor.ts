@@ -1,6 +1,14 @@
 
 // src/utils/ImageProcessor.ts
 
+export interface BatchProcessResult {
+  success: boolean;
+  file: File;
+  result?: ProcessedImage;
+  error?: string;
+  index: number;
+}
+
 export interface ProcessImageConfig {
   resizeOption: 'custom' | 'original' | 'percentage';
   resizePercentage: number;
@@ -513,7 +521,7 @@ class ImageProcessor {
       if (webpSupported) {
         formats.push("image/webp");
       }
-    } catch (e) {
+    } catch {
       console.warn("WebP支持检测失败");
     }
     return formats;
@@ -536,7 +544,6 @@ class ImageProcessor {
     
     if (!canvas) throw new Error("Canvas not available");
 
-    const { progressive = true } = config;
     const maxSizeBytes = maxFileSize * 1024;
 
     if (img && config.resizeMode) {
@@ -568,7 +575,8 @@ class ImageProcessor {
     let dataUrl: string;
     try {
       dataUrl = canvas.toDataURL(selectedFormat, quality);
-    } catch (e) {
+    } catch {
+      // 如果失败，重试一次
       dataUrl = canvas.toDataURL(selectedFormat, quality);
     }
     let currentSize = this.getDataUrlSize(dataUrl);
@@ -610,7 +618,8 @@ class ImageProcessor {
       
       try {
         dataUrl = canvas.toDataURL(selectedFormat, quality);
-      } catch (e) {
+      } catch {
+        // 如果失败，重试一次
         dataUrl = canvas.toDataURL(selectedFormat, quality);
       }
       currentSize = this.getDataUrlSize(dataUrl);
@@ -639,7 +648,8 @@ class ImageProcessor {
     for (let q = bestQuality; q >= 0.01; q -= 0.01) {
        try {
         dataUrl = canvas.toDataURL(selectedFormat, q);
-      } catch (e) {
+      } catch {
+        // 如果失败，重试一次
         dataUrl = canvas.toDataURL(selectedFormat, q);
       }
       currentSize = this.getDataUrlSize(dataUrl);
@@ -731,9 +741,9 @@ class ImageProcessor {
   async batchProcessImages(
     files: File[], 
     config: ProcessImageConfig, 
-    progressCallback?: (progress: { processed: number; total: number; progress: number; currentFile: string; results: any[] }) => void
-    ): Promise<any[]> {
-    const results: any[] = [];
+    progressCallback?: (progress: { processed: number; total: number; progress: number; currentFile: string; results: BatchProcessResult[] }) => void
+    ): Promise<BatchProcessResult[]> {
+    const results: BatchProcessResult[] = [];
     for (let i = 0; i < files.length; i++) {
        try {
         const result = await this.processImage(files[i], config);
@@ -753,12 +763,13 @@ class ImageProcessor {
             results: results,
           });
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error(`处理文件 ${files[i].name} 时出错:`, error);
+        const errorMessage = error instanceof Error ? error.message : '未知错误';
         results.push({
           success: false,
           file: files[i],
-          error: error.message,
+          error: errorMessage,
           index: i,
         });
       }
@@ -806,7 +817,12 @@ class ImageProcessor {
               imageData,
               config,
               file.name,
-              { originalWidth: img.width, originalHeight: img.height },
+              {
+                width: img.width,
+                height: img.height,
+                originalWidth: img.width,
+                originalHeight: img.height,
+              },
             );
             resolve(result);
           };
@@ -825,29 +841,33 @@ class ImageProcessor {
 
   async processImageDataFromChunk(imageData: ImageData, config: ProcessImageConfig, fileName: string, originalSize: Dimensions): Promise<ProcessedImage> {
     const { targetWidth, targetHeight, resizeMode } = config;
-    const { originalWidth, originalHeight } = originalSize;
+    const { originalWidth, originalHeight, width, height } = originalSize;
+
+    // 使用实际的宽高作为原始尺寸，如果未提供则使用 width/height
+    const origWidth = originalWidth ?? width;
+    const origHeight = originalHeight ?? height;
 
     const dimensions = this.calculateTargetDimensions(
-      originalWidth,
-      originalHeight,
+      origWidth,
+      origHeight,
       targetWidth,
       targetHeight,
       resizeMode,
     );
-    
+
     if(!this.canvas) throw new Error("Canvas is not initialized.");
 
     this.canvas.width = dimensions.width;
     this.canvas.height = dimensions.height;
-    
+
     const tempCanvas = document.createElement("canvas");
-    tempCanvas.width = originalWidth;
-    tempCanvas.height = originalHeight;
+    tempCanvas.width = origWidth;
+    tempCanvas.height = origHeight;
     const tempCtx = tempCanvas.getContext("2d");
     if(!tempCtx) throw new Error("Could not create temp canvas context.")
-    
+
     const tempImg = await createImageBitmap(imageData);
-    tempCtx.drawImage(tempImg, 0, 0, originalWidth, originalHeight);
+    tempCtx.drawImage(tempImg, 0, 0, origWidth, origHeight);
 
     this.drawImageWithMode(
       tempCanvas,
@@ -855,11 +875,12 @@ class ImageProcessor {
       dimensions.width,
       dimensions.height,
     );
-    
+
     const optimizedDataUrl = await this.optimizeImageQuality(
       config.maxFileSize,
-      tempCanvas as any,
+      null, // 不使用 img 参数，直接使用 canvas
       config,
+      tempCanvas,
     );
     const fileSize = this.getDataUrlSize(optimizedDataUrl);
 
@@ -867,9 +888,9 @@ class ImageProcessor {
       name: this.generateFileName(fileName, config),
       dataUrl: optimizedDataUrl,
       originalSize: {
-        width: originalWidth,
-        height: originalHeight,
-        fileSize: 0, 
+        width: origWidth,
+        height: origHeight,
+        fileSize: 0,
       },
       processedSize: {
         width: dimensions.width,
@@ -879,10 +900,10 @@ class ImageProcessor {
       sizeReduction: 0,
     };
   }
-  
+
   getMemoryUsage(): MemoryInfo | null {
     if (typeof performance === 'undefined' || !('memory' in performance)) return null;
-    const memory = (performance as any).memory;
+    const memory = (performance as Performance & { memory?: MemoryInfo }).memory;
     if (!memory) return null;
     return {
       jsHeapSizeLimit: memory.jsHeapSizeLimit,
@@ -902,9 +923,8 @@ class ImageProcessor {
       );
       this.clearCache();
       
-      // @ts-ignore
-      if (window.gc) {
-        // @ts-ignore
+      // 类型守卫：检查 gc 函数是否存在
+      if (typeof window.gc === 'function') {
         window.gc();
       }
     }

@@ -2,8 +2,8 @@ import { ProcessImageConfig, ProcessedImage } from './ImageProcessor';
 
 // 类型定义
 interface Task {
-  resolve: (value: any) => void;
-  reject: (reason?: any) => void;
+  resolve: (value: unknown) => void;
+  reject: (reason?: unknown) => void;
 }
 
 interface WorkerStatus {
@@ -44,8 +44,9 @@ class WorkerManager {
       const testWorker = await this.createWorker();
       const support = await this.checkWorkerSupport(testWorker);
       
-      // @ts-ignore
-      if (support.offscreenCanvasSupported && support.imageBitmapSupported) {
+      // Type assertion for worker support check result
+      const supportData = support as { offscreenCanvasSupported: boolean; imageBitmapSupported: boolean };
+      if (supportData.offscreenCanvasSupported && supportData.imageBitmapSupported) {
         this.workerSupported = true;
         this.workerQueue.push(testWorker);
 
@@ -97,7 +98,7 @@ class WorkerManager {
         this.tasks.set(taskId, {
             resolve: (data) => {
                 clearTimeout(timeout);
-                resolve(data);
+                resolve(data as { offscreenCanvasSupported: boolean; imageBitmapSupported: boolean });
             },
             reject: (error) => {
                 clearTimeout(timeout);
@@ -128,7 +129,7 @@ class WorkerManager {
     this.tasks.delete(id);
 
     if (success) {
-      task.resolve(data);
+      task.resolve(data as { offscreenCanvasSupported: boolean; imageBitmapSupported: boolean });
     } else {
       task.reject(new Error(error || "Worker任务失败"));
     }
@@ -148,11 +149,12 @@ class WorkerManager {
       }, 30000);
 
       this.tasks.set(taskId, {
-        resolve: (data) => {
+        resolve: (data: unknown) => {
           clearTimeout(timeout);
-          resolve(data);
+          // Type assertion for process image result
+          resolve(data as ProcessedImage);
         },
-        reject: (error) => {
+        reject: (error: unknown) => {
           clearTimeout(timeout);
           reject(error);
         },

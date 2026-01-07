@@ -41,9 +41,10 @@ function info(message) {
   log(`ℹ️  ${message}`, 'blue');
 }
 
-function warn(message) {
-  log(`⚠️  ${message}`, 'yellow');
-}
+// Function removed as it's not being used
+// function warn(message) {
+//   log(`⚠️  ${message}`, 'yellow');
+// }
 
 /**
  * 验证版本号格式

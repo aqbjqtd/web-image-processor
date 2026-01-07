@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import { ProcessImageConfig, ProcessedImage } from './../utils/ImageProcessor';
+import { ProcessImageConfig } from './../utils/ImageProcessor';
 
 class ImageWorker {
   private canvas: OffscreenCanvas | null = null;
@@ -53,10 +53,11 @@ class ImageWorker {
           fileSize: fileSize,
         },
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return {
         success: false,
-        error: error.message,
+        error: errorMessage,
       };
     }
   }
@@ -175,7 +176,8 @@ self.onmessage = async function (e: MessageEvent) {
       default:
         throw new Error(`Unknown message type: ${type}`);
     }
-  } catch (error: any) {
-    self.postMessage({ id, type: "ERROR", success: false, error: error.message });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    self.postMessage({ id, type: "ERROR", success: false, error: errorMessage });
   }
 };

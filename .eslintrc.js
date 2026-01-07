@@ -27,7 +27,7 @@ module.exports = {
   },
   overrides: [
     {
-      files: ["quasar.config.js"],
+      files: ["quasar.config.js", "scripts/**/*.js"],
       rules: {
         "@typescript-eslint/no-var-requires": "off",
         "@typescript-eslint/no-require-imports": "off",

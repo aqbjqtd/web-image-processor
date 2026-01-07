@@ -274,25 +274,6 @@
       </q-card>
     </div>
 
-    <!-- 统计信息 -->
-    <div class="stats-section">
-      <q-card flat class="stat-card">
-        <div class="stat-number">{{ processedCount }}</div>
-        <div class="stat-label">已处理</div>
-      </q-card>
-      <q-card flat class="stat-card">
-        <div class="stat-number">{{ fileList.length }}</div>
-        <div class="stat-label">待处理</div>
-      </q-card>
-      <q-card flat class="stat-card">
-        <div class="stat-number">{{ formatFileSize(getTotalSize()) }}</div>
-        <div class="stat-label">总大小</div>
-      </q-card>
-      <q-card flat class="stat-card">
-        <div class="stat-number">{{ Math.round(progress * 100) }}%</div>
-        <div class="stat-label">进度</div>
-      </q-card>
-    </div>
 
     <!-- 隐藏文件输入与预览 -->
     <input
@@ -570,21 +551,6 @@ const clearProcessedImages = (): void => {
 };
 
 // 工具函数
-const getTotalSize = (): number => {
-  if (processedImages.value.length === 0) return 0;
-  return processedImages.value.reduce((total, image) => {
-    return total + (image.processedSize ? image.processedSize.fileSize : 0);
-  }, 0);
-};
-
-const formatFileSize = (bytes: number): string => {
-  if (bytes === 0) return "0 Bytes";
-  const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-};
-
 const getFileFormat = (filename: string): string => {
   const ext = filename.split(".").pop().toUpperCase();
   return ext === "JPG" ? "JPEG" : ext;
@@ -703,41 +669,6 @@ onBeforeUnmount(async () => {
   font-size: 0.8rem;
   color: rgba(255, 255, 255, 0.8);
   line-height: 1.2;
-}
-
-.stats-section {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
-  margin-bottom: 32px;
-}
-
-.stat-card {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  text-align: center;
-  border: 1px solid #e0e0e0;
-  transition: all 0.3s ease;
-}
-
-.stat-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-}
-
-.stat-number {
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: #3f51b5;
-  margin-bottom: 8px;
-}
-
-.stat-label {
-  font-size: 0.9rem;
-  color: #616161;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
 .main-content {
@@ -961,9 +892,6 @@ onBeforeUnmount(async () => {
 }
 
 @media (max-width: 600px) {
-  .stats-section {
-    grid-template-columns: 1fr 1fr;
-  }
   .page-title {
     font-size: 2.2rem;
   }

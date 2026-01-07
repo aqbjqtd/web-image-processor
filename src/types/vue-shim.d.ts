@@ -1,18 +1,18 @@
 declare module '*.vue' {
   import type { DefineComponent } from 'vue'
-  const component: DefineComponent<{}, {}, any>
+  const component: DefineComponent<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>
   export default component
 }
 
 declare module 'layouts/MainLayout.vue' {
   import type { DefineComponent } from 'vue'
-  const component: DefineComponent<{}, {}, any>
+  const component: DefineComponent<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>
   export default component
 }
 
 declare module 'pages/*.vue' {
   import type { DefineComponent } from 'vue'
-  const component: DefineComponent<{}, {}, any>
+  const component: DefineComponent<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>
   export default component
 }
 

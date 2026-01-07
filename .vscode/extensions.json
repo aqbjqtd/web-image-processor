@@ -1,0 +1,21 @@
+{
+  "recommendations": [
+    // Vue Language Server (Volar) - 必需
+    "Vue.volar",
+
+    // TypeScript Vue Plugin (Volar) - Vue 3 + TypeScript 支持
+    "Vue.vscode-typescript-vue-plugin",
+
+    // ESLint
+    "dbaeumer.vscode-eslint",
+
+    // Prettier
+    "esbenp.prettier-vscode",
+
+    // Quasar 框架支持
+    "monterail.quasar-snippets",
+
+    // TypeScript Nightly (可选，最新TypeScript特性)
+    "ms-vscode.vscode-typescript-next"
+  ]
+}

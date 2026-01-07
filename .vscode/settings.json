@@ -1,0 +1,49 @@
+{
+  // Vue Language Server (Volar) 配置
+  "vue.server.hybridMode": true,
+
+  // TypeScript 和 Vue 文件支持
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "volar.autoCompleteRefs": true,
+  "volar.codeLens.pugTools": false,
+
+  // Vite 配置
+  "vite.devServer.port": 8080,
+  "vite.autoStart": false,
+
+  // 编辑器配置
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  },
+
+  // 文件关联
+  "files.associations": {
+    "*.vue": "vue",
+    "*.ts": "typescript",
+    "*.tsx": "typescript"
+  },
+
+  // ESLint 配置
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact",
+    "vue"
+  ],
+
+  // Vue 特定配置
+  "vetur.validation.template": false,
+  "vetur.validation.script": false,
+  "vetur.validation.style": false,
+
+  // 括号对颜色
+  "editor.bracketPairColorization.enabled": true,
+  "editor.guides.bracketPairs": true,
+
+  // Quasar 框架支持
+  "quasar.peekSupport": true
+}

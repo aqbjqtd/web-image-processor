@@ -430,6 +430,40 @@ class ImageProcessor {
     this.compressionCache.clear();
   }
   
+  /**
+   * 分析图像复杂度（用于自适应压缩）
+   *
+   * === 算法原理 ===
+   *
+   * 本算法通过多维度分析图像复杂度，为后续压缩提供质量参考：
+   *
+   * 1. **方差分析** (权重 40%)
+   *    - 计算像素值方差，检测图像细节丰富度
+   *    - 高方差 → 细节丰富 → 需要更高质量
+   *    - 低方差 → 平坦区域 → 可以降低质量
+   *
+   * 2. **边缘检测** (权重 30%)
+   *    - 使用8邻域 Laplacian 算子检测边缘
+   *    - 多边缘 → 复杂图像 → 需要更高质量
+   *    - 少边缘 → 简单图像 → 可以降低质量
+   *
+   * 3. **颜色分析** (权重 30%)
+   *    - 统计唯一颜色数量，评估色彩丰富度
+   *    - 多颜色 → 色彩丰富 → 需要更高质量
+   *    - 少颜色 → 色彩单一 → 可以降低质量
+   *
+   * 4. **综合评分**
+   *    - 加权平均 (0-1分，1为最复杂)
+   *    - 根据评分推荐起始压缩质量 (0.5-0.95)
+   *
+   * === 复杂度分析 ===
+   *
+   * 时间复杂度: O(n)，其中 n 为采样像素数（最多 200x200 = 40,000）
+   * 空间复杂度: O(n)，用于存储像素数据
+   *
+   * @param img - 待分析的图像元素
+   * @returns 复杂度分析结果，包含评分 (0-1) 和建议的起始质量 (0.5-0.95)
+   */
   analyzeImageComplexity(img: HTMLImageElement): ComplexityResult {
     const sampleSize = Math.min(ImageProcessor.COMPLEXITY_SAMPLE_SIZE, img.width, img.height);
     const sampleCanvas = document.createElement("canvas");
@@ -498,7 +532,7 @@ class ImageProcessor {
     };
   }
 
-  selectOptimalFormat(img: HTMLImageElement, complexity: ComplexityResult): OptimalFormatResult {
+  selectOptimalFormat(img: HTMLImageElement, complexity: ComplexityResult, maxFileSize: number = 1000): OptimalFormatResult {
     const hasTransparency = this.checkTransparency(img);
     const isPhotographic = complexity.complexityScore > ImageProcessor.PHOTO_IMAGE_THRESHOLD;
     const isSimpleGraphic =
@@ -506,12 +540,27 @@ class ImageProcessor {
 
     let recommendedFormats: Array<'image/png' | 'image/webp' | 'image/jpeg'> = [];
 
+    // 估算 PNG 文件大小（简单估算：基于图像尺寸）
+    const estimatedPngSize = (img.width * img.height * 4) / (1024 * 1024); // MB 转为 KB
+
     if (hasTransparency) {
-      recommendedFormats = ["image/png", "image/webp"];
+      // 如果有透明度，优先考虑 PNG
+      // 但如果 PNG 可能过大且有 WebP 支持，优先选择 WebP
+      if (estimatedPngSize > ImageProcessor.PNG_SIZE_THRESHOLD && maxFileSize < estimatedPngSize) {
+        recommendedFormats = ["image/webp", "image/png"];
+      } else {
+        recommendedFormats = ["image/png", "image/webp"];
+      }
     } else if (isSimpleGraphic) {
       recommendedFormats = ["image/png", "image/webp", "image/jpeg"];
     } else if (isPhotographic) {
-      recommendedFormats = ["image/jpeg", "image/webp"];
+      // 摄影图像：如果质量足够高，优先选择 WebP
+      const estimatedQuality = complexity.recommendedStartQuality;
+      if (estimatedQuality > ImageProcessor.WEBP_QUALITY_THRESHOLD) {
+        recommendedFormats = ["image/webp", "image/jpeg"];
+      } else {
+        recommendedFormats = ["image/jpeg", "image/webp"];
+      }
     } else {
       recommendedFormats = ["image/webp", "image/jpeg", "image/png"];
     }
@@ -613,6 +662,7 @@ class ImageProcessor {
    */
   private analyzeAndSelectFormat(
     img: HTMLImageElement | null,
+    maxFileSize: number = 1000,
   ): { format: 'image/jpeg' | 'image/png' | 'image/webp'; quality: number } {
     let quality = ImageProcessor.BINARY_SEARCH_MAX_QUALITY;
     let selectedFormat: 'image/jpeg' | 'image/png' | 'image/webp' = "image/jpeg";
@@ -620,7 +670,7 @@ class ImageProcessor {
     if (img) {
       const complexity = this.analyzeImageComplexity(img);
       quality = complexity.recommendedStartQuality;
-      const formatSelection = this.selectOptimalFormat(img, complexity);
+      const formatSelection = this.selectOptimalFormat(img, complexity, maxFileSize);
       selectedFormat = formatSelection.primaryFormat;
     }
 
@@ -769,7 +819,42 @@ class ImageProcessor {
   }
 
   /**
-   * 主优化方法 - 重构后的版本
+   * 优化图像质量（智能压缩）
+   *
+   * === 算法原理 ===
+   *
+   * 本方法使用二分查找算法寻找满足文件大小限制的最高质量值：
+   *
+   * 1. **缓存检查**：避免重复压缩相同图像
+   * 2. **格式选择**：根据图像特征选择最优格式 (JPEG/PNG/WebP)
+   * 3. **二分查找**：O(log n) 时间复杂度查找最优质量
+   * 4. **降级策略**：
+   *    - 线性搜索：二分查找失败时的备选方案
+   *    - 尺寸缩减：无法通过质量控制大小时的最终手段
+   *
+   * === 二分查找算法 ===
+   *
+   * ```
+   * low = 0.01, high = 0.9
+   * while (high - low > precision):
+   *     mid = (low + high) * qualityRatio  // 自适应比例
+   *     if (compress(mid) <= maxSize):
+   *         low = mid  // 质量足够，尝试更高
+   *     else:
+   *         high = mid  // 文件过大，降低质量
+   * return low
+   * ```
+   *
+   * === 复杂度分析 ===
+   *
+   * 时间复杂度: O(log n * m)，其中 n 为质量搜索范围，m 为单次压缩时间
+   * 空间复杂度: O(1)，仅需常数空间存储中间结果
+   *
+   * @param maxFileSize - 目标文件大小（KB）
+   * @param img - 待压缩的图像元素（null 表示使用缓存的图像）
+   * @param config - 处理配置（可选）
+   * @param canvas - Canvas 元素（可选，默认使用实例的 canvas）
+   * @returns Promise<string> - 压缩后的 data URL
    */
   async optimizeImageQuality(
     maxFileSize: number,
@@ -779,12 +864,25 @@ class ImageProcessor {
   ): Promise<string> {
     if (!canvas) throw new Error("Canvas not available");
 
+    // 文件大小限制验证
+    if (maxFileSize < ImageProcessor.MIN_FILE_SIZE) {
+      console.warn(
+        `目标文件大小 ${maxFileSize}KB 小于推荐最小值 ${ImageProcessor.MIN_FILE_SIZE}KB，可能影响质量`
+      );
+    }
+
+    if (maxFileSize > ImageProcessor.MAX_FILE_SIZE) {
+      console.warn(
+        `目标文件大小 ${maxFileSize}KB 超过推荐最大值 ${ImageProcessor.MAX_FILE_SIZE}KB，可能导致处理失败`
+      );
+    }
+
     // 1. 检查缓存
     const cachedResult = this.tryGetFromCache(maxFileSize, img, config, canvas);
     if (cachedResult) return cachedResult;
 
     // 2. 分析并选择格式
-    const { format, quality: startQuality } = this.analyzeAndSelectFormat(img);
+    const { format, quality: startQuality } = this.analyzeAndSelectFormat(img, maxFileSize);
 
     // 3. 二分查找优化
     const binarySearchResult = await this.optimizeWithBinarySearch(
@@ -907,7 +1005,36 @@ class ImageProcessor {
           });
         }
       } catch (error: unknown) {
-        console.error(`处理文件 ${files[i].name} 时出错:`, error);
+        // 结构化错误日志
+        const errorDetails = {
+          message: "批量文件处理失败",
+          timestamp: new Date().toISOString(),
+          file: {
+            name: files[i].name,
+            size: `${(files[i].size / 1024).toFixed(2)}KB`,
+            type: files[i].type,
+            lastModified: new Date(files[i].lastModified).toISOString(),
+          },
+          config: {
+            targetWidth: config.targetWidth,
+            targetHeight: config.targetHeight,
+            maxFileSize: config.maxFileSize,
+            resizeOption: config.resizeOption,
+            resizeMode: config.resizeMode,
+            format: config.format,
+          },
+          error:
+            error instanceof Error
+              ? {
+                  name: error.name,
+                  message: error.message,
+                  stack: error.stack,
+                }
+              : error,
+        };
+
+        console.error("批量处理错误:", errorDetails);
+
         const errorMessage = error instanceof Error ? error.message : '未知错误';
         results.push({
           success: false,

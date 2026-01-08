@@ -400,8 +400,57 @@ const selectFolder = (): void => {
   input.click();
 };
 
+// 输入验证函数
+const validateDimensions = (): boolean => {
+  // 定义常量
+  const MIN_SIZE = 1;
+  const MAX_SIZE = 8192;
+  const MIN_PERCENTAGE = 1;
+  const MAX_PERCENTAGE = 200;
+
+  // 验证宽度
+  if (targetWidth.value < MIN_SIZE || targetWidth.value > MAX_SIZE) {
+    $q.notify({
+      type: "warning",
+      message: `宽度必须在 ${MIN_SIZE}-${MAX_SIZE}px 之间`,
+      position: "top",
+      timeout: 3000,
+    });
+    return false;
+  }
+
+  // 验证高度
+  if (targetHeight.value < MIN_SIZE || targetHeight.value > MAX_SIZE) {
+    $q.notify({
+      type: "warning",
+      message: `高度必须在 ${MIN_SIZE}-${MAX_SIZE}px 之间`,
+      position: "top",
+      timeout: 3000,
+    });
+    return false;
+  }
+
+  // 验证百分比
+  if (resizePercentage.value < MIN_PERCENTAGE || resizePercentage.value > MAX_PERCENTAGE) {
+    $q.notify({
+      type: "warning",
+      message: `缩放比例必须在 ${MIN_PERCENTAGE}-${MAX_PERCENTAGE}% 之间`,
+      position: "top",
+      timeout: 3000,
+    });
+    return false;
+  }
+
+  return true;
+};
+
 // 处理函数
 const startProcessing = async (): Promise<void> => {
+  // 首先验证输入
+  if (!validateDimensions()) {
+    return;
+  }
+
   if (fileList.value.length === 0) {
     $q.notify({
       type: "warning",
@@ -450,10 +499,40 @@ const startProcessing = async (): Promise<void> => {
       });
     }
   } catch (error) {
-    console.error("处理失败:", error);
+    // 结构化错误日志
+    const errorDetails = {
+      message: "批量图像处理失败",
+      timestamp: new Date().toISOString(),
+      processingStats: {
+        totalFiles: totalCount.value,
+        processedFiles: processedCount.value,
+        progress: `${(progress.value * 100).toFixed(1)}%`,
+      },
+      config: {
+        resizeOption: config.resizeOption,
+        resizePercentage: config.resizePercentage,
+        targetWidth: config.targetWidth,
+        targetHeight: config.targetHeight,
+        resizeMode: config.resizeMode,
+        maxFileSize: `${config.maxFileSize}KB`,
+        concurrency: config.concurrency,
+      },
+      error:
+        error instanceof Error
+          ? {
+              name: error.name,
+              message: error.message,
+              stack: error.stack,
+            }
+          : error,
+    };
+
+    console.error("图像处理错误:", errorDetails);
+
     $q.notify({
       type: "negative",
-      message: `处理失败: ${error.message}`,
+      message: `处理失败: ${error instanceof Error ? error.message : String(error)}`,
+      caption: `已处理 ${processedCount.value}/${totalCount.value} 张图片`,
       position: "top",
       timeout: 5000,
     });

@@ -1,5 +1,6 @@
 
 // src/utils/ImageProcessor.ts
+import performanceMonitor from './PerformanceMonitor';
 
 export interface BatchProcessResult {
   success: boolean;
@@ -74,10 +75,43 @@ export interface MemoryInfo {
 }
 
 class ImageProcessor {
+  // ========== 常量定义 ==========
+
+  // 文件大小限制
+  private static readonly MAX_DIRECT_MEMORY_SIZE = 50 * 1024 * 1024; // 50MB
+  private static readonly MIN_FILE_SIZE = 50; // 50KB
+  private static readonly MAX_FILE_SIZE = 5000; // 5000KB (5MB)
+
+  // 图像分析
+  private static readonly COMPLEXITY_SAMPLE_SIZE = 200;
+  private static readonly EDGE_DETECTION_THRESHOLD = 400;
+
+  // 二分查找
+  private static readonly BINARY_SEARCH_PRECISION = 0.005;
+  private static readonly BINARY_SEARCH_MAX_ITERATIONS = 20;
+  private static readonly BINARY_SEARCH_MIN_QUALITY = 0.01;
+  private static readonly BINARY_SEARCH_MAX_QUALITY = 0.9;
+
+  // 缓存
+  private static readonly MAX_CACHE_SIZE = 50;
+
+  // 内存管理
+  private static readonly MEMORY_CLEANUP_THRESHOLD = 0.85; // 85%
+
+  // 格式选择
+  private static readonly WEBP_QUALITY_THRESHOLD = 0.85;
+  private static readonly PHOTO_IMAGE_THRESHOLD = 0.6;
+  private static readonly PNG_SIZE_THRESHOLD = 300; // KB
+
+  // 图像尺寸限制
+  private static readonly MAX_DIMENSION = 8192;
+  private static readonly MIN_DIMENSION = 1;
+
+  // 实例属性
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
   private compressionCache: Map<string, { dataUrl: string; lastAccessed: number; createdAt: number; }> = new Map();
-  private maxCacheSize = 50;
+  private maxCacheSize = ImageProcessor.MAX_CACHE_SIZE;
 
   constructor() {
     this.initCanvas();
@@ -95,12 +129,17 @@ class ImageProcessor {
   }
 
   async processImage(file: File, config: ProcessImageConfig): Promise<ProcessedImage> {
+    const start = performance.now();
+
     this.checkAndCleanMemory();
 
-    const MAX_DIRECT_MEMORY_SIZE = 50 * 1024 * 1024; // 50MB
+    if (file.size > ImageProcessor.MAX_DIRECT_MEMORY_SIZE) {
+      const result = await this.processImageChunked(file, config);
 
-    if (file.size > MAX_DIRECT_MEMORY_SIZE) {
-      return this.processImageChunked(file, config);
+      const duration = performance.now() - start;
+      performanceMonitor.recordOperation('processImage.chunked', duration);
+
+      return result;
     }
 
     if (!this.isValidImageFile(file)) {
@@ -129,6 +168,10 @@ class ImageProcessor {
                 config,
                 file.name,
               );
+
+              const duration = performance.now() - start;
+              performanceMonitor.recordOperation('processImage', duration);
+
               resolve(result);
             } catch (error) {
               reject(error);
@@ -388,7 +431,7 @@ class ImageProcessor {
   }
   
   analyzeImageComplexity(img: HTMLImageElement): ComplexityResult {
-    const sampleSize = Math.min(200, img.width, img.height);
+    const sampleSize = Math.min(ImageProcessor.COMPLEXITY_SAMPLE_SIZE, img.width, img.height);
     const sampleCanvas = document.createElement("canvas");
     sampleCanvas.width = sampleSize;
     sampleCanvas.height = sampleSize;
@@ -429,7 +472,7 @@ class ImageProcessor {
             neighbors.reduce((sum, val) => sum + Math.pow(val - r, 2), 0) / 8;
           totalVariance += variance;
 
-          if (variance > 400) edgeCount++;
+          if (variance > ImageProcessor.EDGE_DETECTION_THRESHOLD) edgeCount++;
         }
       }
     }
@@ -457,7 +500,7 @@ class ImageProcessor {
 
   selectOptimalFormat(img: HTMLImageElement, complexity: ComplexityResult): OptimalFormatResult {
     const hasTransparency = this.checkTransparency(img);
-    const isPhotographic = complexity.complexityScore > 0.6;
+    const isPhotographic = complexity.complexityScore > ImageProcessor.PHOTO_IMAGE_THRESHOLD;
     const isSimpleGraphic =
       complexity.uniqueColors < 256 && complexity.edgeRatio < 0.1;
 
@@ -534,37 +577,46 @@ class ImageProcessor {
     return "根据图像特征自动选择最优格式";
   }
 
+  // ========== 优化相关辅助方法 ==========
 
-  async optimizeImageQuality(
+  /**
+   * 尝试从缓存中获取压缩结果
+   */
+  private tryGetFromCache(
     maxFileSize: number,
-    img: HTMLImageElement | null = null,
-    config: Partial<ProcessImageConfig> = {},
-    canvas: HTMLCanvasElement | null = this.canvas,
-  ): Promise<string> {
-    
-    if (!canvas) throw new Error("Canvas not available");
+    img: HTMLImageElement | null,
+    config: Partial<ProcessImageConfig>,
+    canvas: HTMLCanvasElement,
+  ): string | null {
+    if (!img || !config.resizeMode) return null;
 
     const maxSizeBytes = maxFileSize * 1024;
+    const imageHash = this.generateImageHash(img);
+    const cacheKey = this.generateCacheKey(
+      canvas.width,
+      canvas.height,
+      maxFileSize,
+      config.resizeMode,
+      imageHash,
+    );
 
-    if (img && config.resizeMode) {
-      const imageHash = this.generateImageHash(img);
-      const cacheKey = this.generateCacheKey(
-        canvas.width,
-        canvas.height,
-        maxFileSize,
-        config.resizeMode,
-        imageHash,
-      );
-
-      const cachedResult = this.getFromCache(cacheKey);
-      if (cachedResult && this.getDataUrlSize(cachedResult) <= maxSizeBytes) {
-        return cachedResult;
-      }
+    const cachedResult = this.getFromCache(cacheKey);
+    if (cachedResult && this.getDataUrlSize(cachedResult) <= maxSizeBytes) {
+      return cachedResult;
     }
 
-    let quality = 0.9;
+    return null;
+  }
+
+  /**
+   * 分析图像并选择最优格式
+   */
+  private analyzeAndSelectFormat(
+    img: HTMLImageElement | null,
+  ): { format: 'image/jpeg' | 'image/png' | 'image/webp'; quality: number } {
+    let quality = ImageProcessor.BINARY_SEARCH_MAX_QUALITY;
     let selectedFormat: 'image/jpeg' | 'image/png' | 'image/webp' = "image/jpeg";
-    
+
     if (img) {
       const complexity = this.analyzeImageComplexity(img);
       quality = complexity.recommendedStartQuality;
@@ -572,61 +624,78 @@ class ImageProcessor {
       selectedFormat = formatSelection.primaryFormat;
     }
 
+    return { format: selectedFormat, quality };
+  }
+
+  /**
+   * 使用二分查找优化压缩质量
+   */
+  private async optimizeWithBinarySearch(
+    maxFileSize: number,
+    img: HTMLImageElement | null,
+    config: Partial<ProcessImageConfig>,
+    canvas: HTMLCanvasElement,
+    format: 'image/jpeg' | 'image/png' | 'image/webp',
+    startQuality: number,
+  ): Promise<string | null> {
+    const maxSizeBytes = maxFileSize * 1024;
     let dataUrl: string;
+
+    // 尝试初始质量
     try {
-      dataUrl = canvas.toDataURL(selectedFormat, quality);
+      dataUrl = canvas.toDataURL(format, startQuality);
     } catch {
-      // 如果失败，重试一次
-      dataUrl = canvas.toDataURL(selectedFormat, quality);
+      dataUrl = canvas.toDataURL(format, startQuality);
     }
     let currentSize = this.getDataUrlSize(dataUrl);
 
+    // 如果初始质量就满足要求，直接返回
     if (currentSize <= maxSizeBytes) {
+      this.saveToCacheIfNeeded(img, config, canvas, maxFileSize, dataUrl);
       return dataUrl;
     }
-    
-    let minQuality = 0.01;
-    let maxQuality = 0.9;
-    let bestDataUrl: string | null = null;
-    let bestQuality = minQuality;
-    let precision = 0.005;
 
+    // 二分查找优化
+    let minQuality = ImageProcessor.BINARY_SEARCH_MIN_QUALITY;
+    let maxQuality = ImageProcessor.BINARY_SEARCH_MAX_QUALITY;
+    let bestDataUrl: string | null = null;
+    let precision = ImageProcessor.BINARY_SEARCH_PRECISION;
+
+    // 根据文件大小比例调整精度
     const targetRatio = currentSize / maxSizeBytes;
     if (targetRatio > 2.0) {
-      precision = 0.02; 
+      precision = 0.02;
     } else if (targetRatio > 1.5) {
       precision = 0.01;
     }
 
     let iterationCount = 0;
-    const maxIterations = 20;
 
     while (
       maxQuality - minQuality > precision &&
-      iterationCount < maxIterations
+      iterationCount < ImageProcessor.BINARY_SEARCH_MAX_ITERATIONS
     ) {
       iterationCount++;
-      
+
+      // 根据当前文件大小调整质量比例
       let qualityRatio = 0.5;
       if (currentSize > maxSizeBytes * 1.5) {
         qualityRatio = 0.3;
       } else if (currentSize < maxSizeBytes * 0.8) {
         qualityRatio = 0.7;
       }
-      
-      quality = minQuality + (maxQuality - minQuality) * qualityRatio;
-      
+
+      const quality = minQuality + (maxQuality - minQuality) * qualityRatio;
+
       try {
-        dataUrl = canvas.toDataURL(selectedFormat, quality);
+        dataUrl = canvas.toDataURL(format, quality);
       } catch {
-        // 如果失败，重试一次
-        dataUrl = canvas.toDataURL(selectedFormat, quality);
+        dataUrl = canvas.toDataURL(format, quality);
       }
       currentSize = this.getDataUrlSize(dataUrl);
 
       if (currentSize <= maxSizeBytes) {
         bestDataUrl = dataUrl;
-        bestQuality = quality;
         minQuality = quality;
         if (currentSize > maxSizeBytes * 0.9) {
           precision = Math.min(precision, 0.002);
@@ -637,40 +706,114 @@ class ImageProcessor {
     }
 
     if (bestDataUrl && this.getDataUrlSize(bestDataUrl) <= maxSizeBytes) {
-      if (img && config.resizeMode) {
-        const imageHash = this.generateImageHash(img);
-        const cacheKey = this.generateCacheKey(canvas.width, canvas.height, maxFileSize, config.resizeMode, imageHash);
-        this.saveToCache(cacheKey, bestDataUrl);
-      }
+      this.saveToCacheIfNeeded(img, config, canvas, maxFileSize, bestDataUrl);
       return bestDataUrl;
     }
 
-    for (let q = bestQuality; q >= 0.01; q -= 0.01) {
-       try {
-        dataUrl = canvas.toDataURL(selectedFormat, q);
+    return null;
+  }
+
+  /**
+   * 线性搜索降级方案
+   */
+  private async linearSearchFallback(
+    maxFileSize: number,
+    img: HTMLImageElement | null,
+    config: Partial<ProcessImageConfig>,
+    canvas: HTMLCanvasElement,
+    format: 'image/jpeg' | 'image/png' | 'image/webp',
+    startQuality: number,
+  ): Promise<string | null> {
+    const maxSizeBytes = maxFileSize * 1024;
+    let dataUrl: string;
+    let currentSize: number;
+
+    for (let q = startQuality; q >= ImageProcessor.BINARY_SEARCH_MIN_QUALITY; q -= 0.01) {
+      try {
+        dataUrl = canvas.toDataURL(format, q);
       } catch {
-        // 如果失败，重试一次
-        dataUrl = canvas.toDataURL(selectedFormat, q);
+        dataUrl = canvas.toDataURL(format, q);
       }
       currentSize = this.getDataUrlSize(dataUrl);
 
       if (currentSize <= maxSizeBytes) {
-        if (img && config.resizeMode) {
-          const imageHash = this.generateImageHash(img);
-          const cacheKey = this.generateCacheKey(canvas.width, canvas.height, maxFileSize, config.resizeMode, imageHash);
-          this.saveToCache(cacheKey, dataUrl);
-        }
+        this.saveToCacheIfNeeded(img, config, canvas, maxFileSize, dataUrl);
         return dataUrl;
       }
     }
-    
-    const finalResult = await this.fallbackSizeReduction(maxSizeBytes);
 
-    if (img && config.resizeMode) {
-      const imageHash = this.generateImageHash(img);
-      const cacheKey = this.generateCacheKey(canvas.width, canvas.height, maxFileSize, config.resizeMode, imageHash);
-      this.saveToCache(cacheKey, finalResult);
-    }
+    return null;
+  }
+
+  /**
+   * 保存到缓存（如果条件满足）
+   */
+  private saveToCacheIfNeeded(
+    img: HTMLImageElement | null,
+    config: Partial<ProcessImageConfig>,
+    canvas: HTMLCanvasElement,
+    maxFileSize: number,
+    dataUrl: string,
+  ): void {
+    if (!img || !config.resizeMode) return;
+
+    const imageHash = this.generateImageHash(img);
+    const cacheKey = this.generateCacheKey(
+      canvas.width,
+      canvas.height,
+      maxFileSize,
+      config.resizeMode,
+      imageHash,
+    );
+    this.saveToCache(cacheKey, dataUrl);
+  }
+
+  /**
+   * 主优化方法 - 重构后的版本
+   */
+  async optimizeImageQuality(
+    maxFileSize: number,
+    img: HTMLImageElement | null = null,
+    config: Partial<ProcessImageConfig> = {},
+    canvas: HTMLCanvasElement | null = this.canvas,
+  ): Promise<string> {
+    if (!canvas) throw new Error("Canvas not available");
+
+    // 1. 检查缓存
+    const cachedResult = this.tryGetFromCache(maxFileSize, img, config, canvas);
+    if (cachedResult) return cachedResult;
+
+    // 2. 分析并选择格式
+    const { format, quality: startQuality } = this.analyzeAndSelectFormat(img);
+
+    // 3. 二分查找优化
+    const binarySearchResult = await this.optimizeWithBinarySearch(
+      maxFileSize,
+      img,
+      config,
+      canvas,
+      format,
+      startQuality,
+    );
+
+    if (binarySearchResult) return binarySearchResult;
+
+    // 4. 线性搜索降级
+    const linearSearchResult = await this.linearSearchFallback(
+      maxFileSize,
+      img,
+      config,
+      canvas,
+      format,
+      startQuality,
+    );
+
+    if (linearSearchResult) return linearSearchResult;
+
+    // 5. 最终降级：尺寸缩减
+    const finalResult = await this.fallbackSizeReduction(maxFileSize * 1024);
+    this.saveToCacheIfNeeded(img, config, canvas, maxFileSize, finalResult);
+
     return finalResult;
   }
 
@@ -917,12 +1060,12 @@ class ImageProcessor {
     if (!memory) return;
 
     const memoryUsageRatio = memory.usedJSHeapSize / memory.jsHeapSizeLimit;
-    if (memoryUsageRatio > 0.85) {
+    if (memoryUsageRatio > ImageProcessor.MEMORY_CLEANUP_THRESHOLD) {
       console.warn(
         `高内存使用率 (${(memoryUsageRatio * 100).toFixed(2)}%)，正在清理缓存...`,
       );
       this.clearCache();
-      
+
       // 类型守卫：检查 gc 函数是否存在
       if (typeof window.gc === 'function') {
         window.gc();
@@ -967,16 +1110,16 @@ class ImageProcessor {
     return supportedTypes.includes(file.type.toLowerCase());
   }
   
-  isValidFileSize(file: File, maxSize = 50 * 1024 * 1024): boolean {
+  isValidFileSize(file: File, maxSize = ImageProcessor.MAX_DIRECT_MEMORY_SIZE): boolean {
     return file.size <= maxSize;
   }
 
   isValidImageDimensions(img: HTMLImageElement, limits: Partial<Dimensions & {maxWidth: number, maxHeight: number, minWidth: number, minHeight: number}> = {}): boolean {
     const {
-      maxWidth = 8192,
-      maxHeight = 8192,
-      minWidth = 1,
-      minHeight = 1,
+      maxWidth = ImageProcessor.MAX_DIMENSION,
+      maxHeight = ImageProcessor.MAX_DIMENSION,
+      minWidth = ImageProcessor.MIN_DIMENSION,
+      minHeight = ImageProcessor.MIN_DIMENSION,
     } = limits;
 
     return (
@@ -989,6 +1132,33 @@ class ImageProcessor {
 
   dispose(): void {
     this.cleanup();
+  }
+
+  // ========== 性能监控 ==========
+
+  /**
+   * 获取性能统计数据
+   *
+   * @returns 所有操作的性能统计
+   */
+  getPerformanceStats(): Record<string, import('./PerformanceMonitor').PerformanceStats> {
+    return performanceMonitor.getAllStats();
+  }
+
+  /**
+   * 重置性能监控数据
+   */
+  resetPerformanceStats(): void {
+    performanceMonitor.reset();
+  }
+
+  /**
+   * 打印性能报告
+   *
+   * @param operation - 可选，指定要打印的操作名称
+   */
+  printPerformanceReport(operation?: string): void {
+    performanceMonitor.printReport(operation);
   }
 }
 

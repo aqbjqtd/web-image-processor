@@ -1,0 +1,41 @@
+services:
+  web-image-processor:
+    build: .
+    image: web-image-processor:latest
+    container_name: web-image-processor-v2
+    restart: unless-stopped
+    ports:
+      - "9000:80"
+    environment:
+      - TZ=Asia/Shanghai
+      - NODE_ENV=production
+    # 健康检查 - 使用curl更可靠
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+        reservations:
+          memory: 256M
+          cpus: "0.5"
+    # 日志配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # 安全配置
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /var/log/nginx

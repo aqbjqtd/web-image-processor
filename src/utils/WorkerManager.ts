@@ -1,4 +1,4 @@
-import { ProcessImageConfig, ProcessedImage } from './ImageProcessor';
+import { ProcessImageConfig, ProcessedImage } from "./ImageProcessor";
 
 // 类型定义
 interface Task {
@@ -25,7 +25,10 @@ class WorkerManager {
   private initialized = false;
 
   constructor() {
-    this.maxWorkers = typeof navigator !== 'undefined' ? Math.min(4, navigator.hardwareConcurrency || 2) : 2;
+    this.maxWorkers =
+      typeof navigator !== "undefined"
+        ? Math.min(4, navigator.hardwareConcurrency || 2)
+        : 2;
   }
 
   async init(): Promise<boolean> {
@@ -43,10 +46,8 @@ class WorkerManager {
 
       const testWorker = await this.createWorker();
       const support = await this.checkWorkerSupport(testWorker);
-      
-      // Type assertion for worker support check result
-      const supportData = support as { offscreenCanvasSupported: boolean; imageBitmapSupported: boolean };
-      if (supportData.offscreenCanvasSupported && supportData.imageBitmapSupported) {
+
+      if (support.offscreenCanvasSupported && support.imageBitmapSupported) {
         this.workerSupported = true;
         this.workerQueue.push(testWorker);
 
@@ -72,7 +73,9 @@ class WorkerManager {
   private async createWorker(): Promise<Worker> {
     return new Promise((resolve, reject) => {
       try {
-        const worker = new Worker(new URL("../workers/imageWorker.ts", import.meta.url));
+        const worker = new Worker(
+          new URL("../workers/imageWorker.ts", import.meta.url),
+        );
         worker.onerror = (error) => {
           console.error("Worker错误:", error);
           reject(error);
@@ -88,28 +91,72 @@ class WorkerManager {
     });
   }
 
-  private async checkWorkerSupport(worker: Worker): Promise<{ offscreenCanvasSupported: boolean; imageBitmapSupported: boolean; }> {
+  // 类型守卫函数，确保 Worker 支持检查返回的数据类型安全
+  private isWorkerSupportData(data: unknown): data is {
+    offscreenCanvasSupported: boolean;
+    imageBitmapSupported: boolean;
+  } {
+    if (typeof data !== "object" || data === null) {
+      return false;
+    }
+
+    const obj = data as Record<string, unknown>;
+    return (
+      "offscreenCanvasSupported" in obj &&
+      "imageBitmapSupported" in obj &&
+      typeof obj.offscreenCanvasSupported === "boolean" &&
+      typeof obj.imageBitmapSupported === "boolean"
+    );
+  }
+
+  // 类型守卫函数，确保图像处理结果数据类型安全
+  private isProcessedImage(data: unknown): data is ProcessedImage {
+    if (typeof data !== "object" || data === null) {
+      return false;
+    }
+
+    const obj = data as Record<string, unknown>;
+    return (
+      "name" in obj &&
+      "dataUrl" in obj &&
+      "originalSize" in obj &&
+      "processedSize" in obj &&
+      "sizeReduction" in obj &&
+      typeof obj.name === "string" &&
+      typeof obj.dataUrl === "string" &&
+      typeof obj.sizeReduction === "number"
+    );
+  }
+
+  private async checkWorkerSupport(worker: Worker): Promise<{
+    offscreenCanvasSupported: boolean;
+    imageBitmapSupported: boolean;
+  }> {
     return new Promise((resolve, reject) => {
-        const taskId = this.generateTaskId();
-        const timeout = setTimeout(() => {
-            reject(new Error("Worker支持检查超时"));
-        }, 5000);
+      const taskId = this.generateTaskId();
+      const timeout = setTimeout(() => {
+        reject(new Error("Worker支持检查超时"));
+      }, 5000);
 
-        this.tasks.set(taskId, {
-            resolve: (data) => {
-                clearTimeout(timeout);
-                resolve(data as { offscreenCanvasSupported: boolean; imageBitmapSupported: boolean });
-            },
-            reject: (error) => {
-                clearTimeout(timeout);
-                reject(error);
-            },
-        });
+      this.tasks.set(taskId, {
+        resolve: (data) => {
+          clearTimeout(timeout);
+          if (this.isWorkerSupportData(data)) {
+            resolve(data);
+          } else {
+            reject(new Error("Worker支持检查返回数据格式错误"));
+          }
+        },
+        reject: (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        },
+      });
 
-        worker.postMessage({
-            id: taskId,
-            type: "CHECK_SUPPORT",
-        });
+      worker.postMessage({
+        id: taskId,
+        type: "CHECK_SUPPORT",
+      });
     });
   }
 
@@ -129,13 +176,22 @@ class WorkerManager {
     this.tasks.delete(id);
 
     if (success) {
-      task.resolve(data as { offscreenCanvasSupported: boolean; imageBitmapSupported: boolean });
+      if (this.isWorkerSupportData(data)) {
+        task.resolve(data);
+      } else {
+        task.reject(new Error("Worker返回数据格式错误"));
+      }
     } else {
       task.reject(new Error(error || "Worker任务失败"));
     }
   }
 
-  async processImage(imageData: ImageData, config: ProcessImageConfig, targetWidth: number, targetHeight: number): Promise<ProcessedImage> {
+  async processImage(
+    imageData: ImageData,
+    config: ProcessImageConfig,
+    targetWidth: number,
+    targetHeight: number,
+  ): Promise<ProcessedImage> {
     if (!this.workerSupported) {
       throw new Error("Worker不可用，请使用主线程处理");
     }
@@ -151,8 +207,11 @@ class WorkerManager {
       this.tasks.set(taskId, {
         resolve: (data: unknown) => {
           clearTimeout(timeout);
-          // Type assertion for process image result
-          resolve(data as ProcessedImage);
+          if (this.isProcessedImage(data)) {
+            resolve(data);
+          } else {
+            reject(new Error("Worker返回图像处理结果格式错误"));
+          }
         },
         reject: (error: unknown) => {
           clearTimeout(timeout);

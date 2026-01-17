@@ -1,0 +1,57 @@
+services:
+  web-image-processor:
+    build: .
+    image: web-image-processor:latest
+    container_name: web-image-processor-prod
+    restart: always
+    ports:
+      - "9000:80"
+    environment:
+      - TZ=Asia/Shanghai
+      - NODE_ENV=production
+    # 增强健康检查
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/ -s -o /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # 资源限制 - 适合512MB VPS
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+        reservations:
+          memory: 256M
+          cpus: "0.5"
+    # 日志配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # 安全配置
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /var/log/nginx
+    # 网络配置
+    networks:
+      - web-network
+    # 标签
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.image-processor.rule=Host(`localhost`)"
+      - "traefik.http.services.image-processor.loadbalancer.server.port=80"
+
+# 自定义网络
+networks:
+  web-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

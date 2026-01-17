@@ -1,6 +1,13 @@
-
 // src/utils/ImageProcessor.ts
-import performanceMonitor from './PerformanceMonitor';
+import performanceMonitor from "./PerformanceMonitor";
+import { ImageRenderer } from "./ImageRenderer";
+import {
+  FILE_SIZE_LIMITS,
+  COMPLEXITY_CONFIG,
+  COMPRESSION_CONFIG,
+  IMAGE_FORMATS,
+  ImageFormat,
+} from "./ImageConfig";
 
 export interface BatchProcessResult {
   success: boolean;
@@ -11,16 +18,16 @@ export interface BatchProcessResult {
 }
 
 export interface ProcessImageConfig {
-  resizeOption: 'custom' | 'original' | 'percentage';
+  resizeOption: "custom" | "original" | "percentage";
   resizePercentage: number;
   targetWidth: number;
   targetHeight: number;
-  resizeMode: 'keep_ratio_pad' | 'keep_ratio_crop' | 'stretch';
+  resizeMode: "keep_ratio_pad" | "keep_ratio_crop" | "stretch";
   maxFileSize: number;
   concurrency?: number;
   useWasm?: boolean;
   progressive?: boolean;
-  format?: 'image/jpeg' | 'image/png' | 'image/webp';
+  format?: "image/jpeg" | "image/png" | "image/webp";
   suffix?: string;
 }
 
@@ -57,7 +64,7 @@ export interface ComplexityResult {
 }
 
 export interface OptimalFormatResult {
-  primaryFormat: 'image/jpeg' | 'image/png' | 'image/webp';
+  primaryFormat: "image/jpeg" | "image/png" | "image/webp";
   fallbackFormats: string[];
   reason: string;
 }
@@ -75,22 +82,8 @@ export interface MemoryInfo {
 }
 
 class ImageProcessor {
-  // ========== 常量定义 ==========
-
-  // 文件大小限制
-  private static readonly MAX_DIRECT_MEMORY_SIZE = 50 * 1024 * 1024; // 50MB
-  private static readonly MIN_FILE_SIZE = 50; // 50KB
-  private static readonly MAX_FILE_SIZE = 5000; // 5000KB (5MB)
-
-  // 图像分析
-  private static readonly COMPLEXITY_SAMPLE_SIZE = 200;
-  private static readonly EDGE_DETECTION_THRESHOLD = 400;
-
-  // 二分查找
-  private static readonly BINARY_SEARCH_PRECISION = 0.005;
-  private static readonly BINARY_SEARCH_MAX_ITERATIONS = 20;
-  private static readonly BINARY_SEARCH_MIN_QUALITY = 0.01;
-  private static readonly BINARY_SEARCH_MAX_QUALITY = 0.9;
+  // ========== 配置常量导入 ==========
+  // 所有配置常量已移至 ImageConfig.ts
 
   // 缓存
   private static readonly MAX_CACHE_SIZE = 50;
@@ -110,7 +103,10 @@ class ImageProcessor {
   // 实例属性
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
-  private compressionCache: Map<string, { dataUrl: string; lastAccessed: number; createdAt: number; }> = new Map();
+  private compressionCache: Map<
+    string,
+    { dataUrl: string; lastAccessed: number; createdAt: number }
+  > = new Map();
   private maxCacheSize = ImageProcessor.MAX_CACHE_SIZE;
 
   constructor() {
@@ -118,7 +114,7 @@ class ImageProcessor {
   }
 
   private initCanvas(): void {
-    if (typeof document === 'undefined') return;
+    if (typeof document === "undefined") return;
     this.canvas = document.createElement("canvas");
     this.ctx = this.canvas.getContext("2d");
 
@@ -128,16 +124,19 @@ class ImageProcessor {
     }
   }
 
-  async processImage(file: File, config: ProcessImageConfig): Promise<ProcessedImage> {
+  async processImage(
+    file: File,
+    config: ProcessImageConfig,
+  ): Promise<ProcessedImage> {
     const start = performance.now();
 
     this.checkAndCleanMemory();
 
-    if (file.size > ImageProcessor.MAX_DIRECT_MEMORY_SIZE) {
+    if (file.size > FILE_SIZE_LIMITS.MAX_DIRECT_MEMORY) {
       const result = await this.processImageChunked(file, config);
 
       const duration = performance.now() - start;
-      performanceMonitor.recordOperation('processImage.chunked', duration);
+      performanceMonitor.recordOperation("processImage.chunked", duration);
 
       return result;
     }
@@ -170,7 +169,7 @@ class ImageProcessor {
               );
 
               const duration = performance.now() - start;
-              performanceMonitor.recordOperation('processImage', duration);
+              performanceMonitor.recordOperation("processImage", duration);
 
               resolve(result);
             } catch (error) {
@@ -187,7 +186,6 @@ class ImageProcessor {
           } else {
             reject(new Error("文件读取结果为空"));
           }
-          
         } catch (error) {
           reject(error);
         }
@@ -201,7 +199,11 @@ class ImageProcessor {
     });
   }
 
-  async processImageData(img: HTMLImageElement, config: ProcessImageConfig, fileName: string): Promise<ProcessedImage> {
+  async processImageData(
+    img: HTMLImageElement,
+    config: ProcessImageConfig,
+    fileName: string,
+  ): Promise<ProcessedImage> {
     const originalWidth = img.width;
     const originalHeight = img.height;
 
@@ -234,9 +236,9 @@ class ImageProcessor {
         break;
       }
     }
-    
+
     if (!this.canvas || !this.ctx) {
-        throw new Error("Canvas not initialized");
+      throw new Error("Canvas not initialized");
     }
 
     this.canvas.width = targetWidth;
@@ -284,7 +286,7 @@ class ImageProcessor {
     originalHeight: number,
     targetWidth: number,
     targetHeight: number,
-    mode: 'keep_ratio_pad' | 'keep_ratio_crop' | 'stretch',
+    mode: "keep_ratio_pad" | "keep_ratio_crop" | "stretch",
   ): Dimensions {
     if (mode === "stretch") {
       return { width: targetWidth, height: targetHeight };
@@ -306,71 +308,41 @@ class ImageProcessor {
         };
       }
     } else if (mode === "keep_ratio_crop") {
-        return { width: targetWidth, height: targetHeight };
+      return { width: targetWidth, height: targetHeight };
     }
 
     return { width: targetWidth, height: targetHeight };
   }
 
-  drawImageWithMode(img: HTMLImageElement | HTMLCanvasElement, mode: string, canvasWidth: number, canvasHeight: number, context: CanvasRenderingContext2D | null = this.ctx): void {
-    if (!context) return;
-    const originalWidth = img.width;
-    const originalHeight = img.height;
-
-    if (mode === "stretch") {
-      context.drawImage(img, 0, 0, canvasWidth, canvasHeight);
-    } else if (mode === "keep_ratio_pad") {
-      const aspectRatio = originalWidth / originalHeight;
-      const canvasAspectRatio = canvasWidth / canvasHeight;
-
-      let drawWidth, drawHeight, offsetX, offsetY;
-
-      if (aspectRatio > canvasAspectRatio) {
-        drawWidth = canvasWidth;
-        drawHeight = canvasWidth / aspectRatio;
-        offsetX = 0;
-        offsetY = (canvasHeight - drawHeight) / 2;
-      } else {
-        drawWidth = canvasHeight * aspectRatio;
-        drawHeight = canvasHeight;
-        offsetX = (canvasWidth - drawWidth) / 2;
-        offsetY = 0;
-      }
-
-      context.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
-    } else if (mode === "keep_ratio_crop") {
-      const aspectRatio = originalWidth / originalHeight;
-      const canvasAspectRatio = canvasWidth / canvasHeight;
-
-      let sourceX, sourceY, sourceWidth, sourceHeight;
-
-      if (aspectRatio > canvasAspectRatio) {
-        sourceHeight = originalHeight;
-        sourceWidth = originalHeight * canvasAspectRatio;
-        sourceX = (originalWidth - sourceWidth) / 2;
-        sourceY = 0;
-      } else {
-        sourceWidth = originalWidth;
-        sourceHeight = originalWidth / canvasAspectRatio;
-        sourceX = 0;
-        sourceY = (originalHeight - sourceHeight) / 2;
-      }
-
-      context.drawImage(
-        img,
-        sourceX,
-        sourceY,
-        sourceWidth,
-        sourceHeight,
-        0,
-        0,
-        canvasWidth,
-        canvasHeight,
-      );
+  drawImageWithMode(
+    img: HTMLImageElement | HTMLCanvasElement,
+    mode: string,
+    canvasWidth: number,
+    canvasHeight: number,
+    context: CanvasRenderingContext2D | null = this.ctx,
+  ): void {
+    if (!context) {
+      console.warn("绘制上下文为空，无法绘制图像");
+      return;
     }
+
+    // 使用统一的图像渲染器
+    ImageRenderer.drawImageWithMode(
+      img,
+      mode,
+      canvasWidth,
+      canvasHeight,
+      context,
+    );
   }
 
-  private generateCacheKey(width: number, height: number, maxFileSize: number, resizeMode: string, imageHash: string): string {
+  private generateCacheKey(
+    width: number,
+    height: number,
+    maxFileSize: number,
+    resizeMode: string,
+    imageHash: string,
+  ): string {
     return `${width}x${height}_${maxFileSize}kb_${resizeMode}_${imageHash}`;
   }
 
@@ -380,7 +352,7 @@ class ImageProcessor {
     hashCanvas.width = hashSize;
     hashCanvas.height = hashSize;
     const hashCtx = hashCanvas.getContext("2d");
-    if (!hashCtx) return '';
+    if (!hashCtx) return "";
 
     hashCtx.drawImage(img, 0, 0, hashSize, hashSize);
     const imageData = hashCtx.getImageData(0, 0, hashSize, hashSize);
@@ -392,7 +364,7 @@ class ImageProcessor {
     }
     return hash;
   }
-  
+
   private getFromCache(cacheKey: string): string | null {
     if (this.compressionCache.has(cacheKey)) {
       const cached = this.compressionCache.get(cacheKey)!;
@@ -429,7 +401,7 @@ class ImageProcessor {
   clearCache(): void {
     this.compressionCache.clear();
   }
-  
+
   /**
    * 分析图像复杂度（用于自适应压缩）
    *
@@ -465,12 +437,17 @@ class ImageProcessor {
    * @returns 复杂度分析结果，包含评分 (0-1) 和建议的起始质量 (0.5-0.95)
    */
   analyzeImageComplexity(img: HTMLImageElement): ComplexityResult {
-    const sampleSize = Math.min(ImageProcessor.COMPLEXITY_SAMPLE_SIZE, img.width, img.height);
+    const sampleSize = Math.min(
+      COMPLEXITY_CONFIG.SAMPLE_SIZE,
+      img.width,
+      img.height,
+    );
     const sampleCanvas = document.createElement("canvas");
     sampleCanvas.width = sampleSize;
     sampleCanvas.height = sampleSize;
     const sampleCtx = sampleCanvas.getContext("2d");
-    if (!sampleCtx) throw new Error("Could not get 2d context for complexity analysis");
+    if (!sampleCtx)
+      throw new Error("Could not get 2d context for complexity analysis");
 
     sampleCtx.drawImage(img, 0, 0, sampleSize, sampleSize);
     const imageData = sampleCtx.getImageData(0, 0, sampleSize, sampleSize);
@@ -506,7 +483,7 @@ class ImageProcessor {
             neighbors.reduce((sum, val) => sum + Math.pow(val - r, 2), 0) / 8;
           totalVariance += variance;
 
-          if (variance > ImageProcessor.EDGE_DETECTION_THRESHOLD) edgeCount++;
+          if (variance > COMPLEXITY_CONFIG.EDGE_THRESHOLD) edgeCount++;
         }
       }
     }
@@ -532,13 +509,19 @@ class ImageProcessor {
     };
   }
 
-  selectOptimalFormat(img: HTMLImageElement, complexity: ComplexityResult, maxFileSize: number = 1000): OptimalFormatResult {
+  selectOptimalFormat(
+    img: HTMLImageElement,
+    complexity: ComplexityResult,
+    maxFileSize: number = 1000,
+  ): OptimalFormatResult {
     const hasTransparency = this.checkTransparency(img);
-    const isPhotographic = complexity.complexityScore > ImageProcessor.PHOTO_IMAGE_THRESHOLD;
+    const isPhotographic =
+      complexity.complexityScore > ImageProcessor.PHOTO_IMAGE_THRESHOLD;
     const isSimpleGraphic =
       complexity.uniqueColors < 256 && complexity.edgeRatio < 0.1;
 
-    let recommendedFormats: Array<'image/png' | 'image/webp' | 'image/jpeg'> = [];
+    let recommendedFormats: Array<"image/png" | "image/webp" | "image/jpeg"> =
+      [];
 
     // 估算 PNG 文件大小（简单估算：基于图像尺寸）
     const estimatedPngSize = (img.width * img.height * 4) / (1024 * 1024); // MB 转为 KB
@@ -546,7 +529,10 @@ class ImageProcessor {
     if (hasTransparency) {
       // 如果有透明度，优先考虑 PNG
       // 但如果 PNG 可能过大且有 WebP 支持，优先选择 WebP
-      if (estimatedPngSize > ImageProcessor.PNG_SIZE_THRESHOLD && maxFileSize < estimatedPngSize) {
+      if (
+        estimatedPngSize > ImageProcessor.PNG_SIZE_THRESHOLD &&
+        maxFileSize < estimatedPngSize
+      ) {
         recommendedFormats = ["image/webp", "image/png"];
       } else {
         recommendedFormats = ["image/png", "image/webp"];
@@ -588,7 +574,7 @@ class ImageProcessor {
     testCanvas.height = sampleSize;
     const testCtx = testCanvas.getContext("2d");
     if (!testCtx) return false;
-    
+
     testCtx.drawImage(img, 0, 0, sampleSize, sampleSize);
     const imageData = testCtx.getImageData(0, 0, sampleSize, sampleSize);
     const data = imageData.data;
@@ -601,7 +587,7 @@ class ImageProcessor {
 
     return false;
   }
-  
+
   getSupportedFormats(): string[] {
     const formats = ["image/jpeg", "image/png"];
     try {
@@ -619,7 +605,11 @@ class ImageProcessor {
     return formats;
   }
 
-  getFormatSelectionReason(hasTransparency: boolean, isPhotographic: boolean, isSimpleGraphic: boolean): string {
+  getFormatSelectionReason(
+    hasTransparency: boolean,
+    isPhotographic: boolean,
+    isSimpleGraphic: boolean,
+  ): string {
     if (hasTransparency) return "检测到透明度，选择PNG格式";
     if (isSimpleGraphic) return "简单图形，PNG格式压缩效果更好";
     if (isPhotographic) return "摄影图像，JPEG格式更适合";
@@ -663,14 +653,18 @@ class ImageProcessor {
   private analyzeAndSelectFormat(
     img: HTMLImageElement | null,
     maxFileSize: number = 1000,
-  ): { format: 'image/jpeg' | 'image/png' | 'image/webp'; quality: number } {
-    let quality = ImageProcessor.BINARY_SEARCH_MAX_QUALITY;
-    let selectedFormat: 'image/jpeg' | 'image/png' | 'image/webp' = "image/jpeg";
+  ): { format: "image/jpeg" | "image/png" | "image/webp"; quality: number } {
+    let quality: number = COMPRESSION_CONFIG.INITIAL_QUALITY;
+    let selectedFormat: ImageFormat = IMAGE_FORMATS.JPEG;
 
     if (img) {
       const complexity = this.analyzeImageComplexity(img);
       quality = complexity.recommendedStartQuality;
-      const formatSelection = this.selectOptimalFormat(img, complexity, maxFileSize);
+      const formatSelection = this.selectOptimalFormat(
+        img,
+        complexity,
+        maxFileSize,
+      );
       selectedFormat = formatSelection.primaryFormat;
     }
 
@@ -685,7 +679,7 @@ class ImageProcessor {
     img: HTMLImageElement | null,
     config: Partial<ProcessImageConfig>,
     canvas: HTMLCanvasElement,
-    format: 'image/jpeg' | 'image/png' | 'image/webp',
+    format: "image/jpeg" | "image/png" | "image/webp",
     startQuality: number,
   ): Promise<string | null> {
     const maxSizeBytes = maxFileSize * 1024;
@@ -694,8 +688,10 @@ class ImageProcessor {
     // 尝试初始质量
     try {
       dataUrl = canvas.toDataURL(format, startQuality);
-    } catch {
-      dataUrl = canvas.toDataURL(format, startQuality);
+    } catch (error) {
+      console.warn("Canvas压缩失败，使用降级方案:", error);
+      // 降级到默认质量和格式
+      dataUrl = canvas.toDataURL("image/jpeg", 0.8);
     }
     let currentSize = this.getDataUrlSize(dataUrl);
 
@@ -706,26 +702,14 @@ class ImageProcessor {
     }
 
     // 二分查找优化
-    let minQuality = ImageProcessor.BINARY_SEARCH_MIN_QUALITY;
-    let maxQuality = ImageProcessor.BINARY_SEARCH_MAX_QUALITY;
+    let minQuality = COMPRESSION_CONFIG.MIN_QUALITY;
+    let maxQuality = COMPRESSION_CONFIG.INITIAL_QUALITY;
     let bestDataUrl: string | null = null;
-    let precision = ImageProcessor.BINARY_SEARCH_PRECISION;
-
-    // 根据文件大小比例调整精度
-    const targetRatio = currentSize / maxSizeBytes;
-    if (targetRatio > 2.0) {
-      precision = 0.02;
-    } else if (targetRatio > 1.5) {
-      precision = 0.01;
-    }
 
     let iterationCount = 0;
-
-    while (
-      maxQuality - minQuality > precision &&
-      iterationCount < ImageProcessor.BINARY_SEARCH_MAX_ITERATIONS
-    ) {
+    while (maxQuality - minQuality > COMPRESSION_CONFIG.QUALITY_STEP) {
       iterationCount++;
+      if (iterationCount > COMPRESSION_CONFIG.MAX_ITERATIONS) break;
 
       // 根据当前文件大小调整质量比例
       let qualityRatio = 0.5;
@@ -739,19 +723,20 @@ class ImageProcessor {
 
       try {
         dataUrl = canvas.toDataURL(format, quality);
-      } catch {
-        dataUrl = canvas.toDataURL(format, quality);
+      } catch (error) {
+        console.warn("Canvas压缩失败，使用降级方案:", error);
+        dataUrl = canvas.toDataURL(
+          COMPRESSION_CONFIG.DEFAULT_FORMAT,
+          COMPRESSION_CONFIG.FALLBACK_QUALITY,
+        );
       }
       currentSize = this.getDataUrlSize(dataUrl);
 
       if (currentSize <= maxSizeBytes) {
         bestDataUrl = dataUrl;
-        minQuality = quality;
-        if (currentSize > maxSizeBytes * 0.9) {
-          precision = Math.min(precision, 0.002);
-        }
+        (minQuality as number) = quality;
       } else {
-        maxQuality = quality;
+        (maxQuality as number) = quality;
       }
     }
 
@@ -771,14 +756,18 @@ class ImageProcessor {
     img: HTMLImageElement | null,
     config: Partial<ProcessImageConfig>,
     canvas: HTMLCanvasElement,
-    format: 'image/jpeg' | 'image/png' | 'image/webp',
+    format: "image/jpeg" | "image/png" | "image/webp",
     startQuality: number,
   ): Promise<string | null> {
     const maxSizeBytes = maxFileSize * 1024;
     let dataUrl: string;
     let currentSize: number;
 
-    for (let q = startQuality; q >= ImageProcessor.BINARY_SEARCH_MIN_QUALITY; q -= 0.01) {
+    for (
+      let q = startQuality;
+      q >= COMPRESSION_CONFIG.MIN_QUALITY;
+      q -= COMPRESSION_CONFIG.QUALITY_STEP
+    ) {
       try {
         dataUrl = canvas.toDataURL(format, q);
       } catch {
@@ -865,15 +854,20 @@ class ImageProcessor {
     if (!canvas) throw new Error("Canvas not available");
 
     // 文件大小限制验证
-    if (maxFileSize < ImageProcessor.MIN_FILE_SIZE) {
-      console.warn(
-        `目标文件大小 ${maxFileSize}KB 小于推荐最小值 ${ImageProcessor.MIN_FILE_SIZE}KB，可能影响质量`
+    if (maxFileSize < FILE_SIZE_LIMITS.MIN) {
+      throw new Error(
+        `目标文件大小 ${maxFileSize}KB 小于推荐最小值 ${FILE_SIZE_LIMITS.MIN}KB，可能影响质量`,
+      );
+    }
+    if (maxFileSize > FILE_SIZE_LIMITS.MAX) {
+      throw new Error(
+        `目标文件大小 ${maxFileSize}KB 超过最大支持值 ${FILE_SIZE_LIMITS.MAX}KB`,
       );
     }
 
-    if (maxFileSize > ImageProcessor.MAX_FILE_SIZE) {
+    if (maxFileSize > FILE_SIZE_LIMITS.MAX) {
       console.warn(
-        `目标文件大小 ${maxFileSize}KB 超过推荐最大值 ${ImageProcessor.MAX_FILE_SIZE}KB，可能导致处理失败`
+        `目标文件大小 ${maxFileSize}KB 超过推荐最大值 ${FILE_SIZE_LIMITS.MAX}KB，可能导致处理失败`,
       );
     }
 
@@ -882,7 +876,10 @@ class ImageProcessor {
     if (cachedResult) return cachedResult;
 
     // 2. 分析并选择格式
-    const { format, quality: startQuality } = this.analyzeAndSelectFormat(img, maxFileSize);
+    const { format, quality: startQuality } = this.analyzeAndSelectFormat(
+      img,
+      maxFileSize,
+    );
 
     // 3. 二分查找优化
     const binarySearchResult = await this.optimizeWithBinarySearch(
@@ -919,7 +916,7 @@ class ImageProcessor {
     if (!this.canvas) throw new Error("Canvas not available");
     const originalWidth = this.canvas.width;
     const originalHeight = this.canvas.height;
-    
+
     for (let scale = 0.9; scale >= 0.1; scale -= 0.1) {
       const newWidth = Math.max(1, Math.round(originalWidth * scale));
       const newHeight = Math.max(1, Math.round(originalHeight * scale));
@@ -929,12 +926,12 @@ class ImageProcessor {
       tempCanvas.height = newHeight;
       const tempCtx = tempCanvas.getContext("2d");
       if (!tempCtx) continue;
-      
+
       tempCtx.imageSmoothingEnabled = true;
       tempCtx.imageSmoothingQuality = "high";
 
       tempCtx.drawImage(this.canvas, 0, 0, newWidth, newHeight);
-      
+
       for (let q = 0.9; q >= 0.01; q -= 0.1) {
         const dataUrl = tempCanvas.toDataURL("image/jpeg", q);
         if (this.getDataUrlSize(dataUrl) <= maxSizeBytes) {
@@ -942,16 +939,16 @@ class ImageProcessor {
         }
       }
     }
-    
+
     const minCanvas = document.createElement("canvas");
     minCanvas.width = 1;
     minCanvas.height = 1;
     const minCtx = minCanvas.getContext("2d");
-    if(minCtx) {
-        minCtx.fillStyle = "#FFFFFF";
-        minCtx.fillRect(0, 0, 1, 1);
+    if (minCtx) {
+      minCtx.fillStyle = "#FFFFFF";
+      minCtx.fillRect(0, 0, 1, 1);
     }
-    
+
     return minCanvas.toDataURL("image/jpeg", 0.01);
   }
 
@@ -960,8 +957,11 @@ class ImageProcessor {
     if (!base64) return 0;
     return Math.round(base64.length * 0.75);
   }
-  
-  generateFileName(originalName: string, config: Partial<ProcessImageConfig> = {}): string {
+
+  generateFileName(
+    originalName: string,
+    config: Partial<ProcessImageConfig> = {},
+  ): string {
     const { format, suffix = "_processed" } = config;
     const nameWithoutExt = originalName.replace(/\.[^/.]+$/, "");
 
@@ -974,19 +974,25 @@ class ImageProcessor {
         extension = ".webp";
         break;
     }
-    
+
     const timestamp = new Date().getTime();
     return `${nameWithoutExt}${suffix}_${timestamp}${extension}`;
   }
 
   async batchProcessImages(
-    files: File[], 
-    config: ProcessImageConfig, 
-    progressCallback?: (progress: { processed: number; total: number; progress: number; currentFile: string; results: BatchProcessResult[] }) => void
-    ): Promise<BatchProcessResult[]> {
+    files: File[],
+    config: ProcessImageConfig,
+    progressCallback?: (progress: {
+      processed: number;
+      total: number;
+      progress: number;
+      currentFile: string;
+      results: BatchProcessResult[];
+    }) => void,
+  ): Promise<BatchProcessResult[]> {
     const results: BatchProcessResult[] = [];
     for (let i = 0; i < files.length; i++) {
-       try {
+      try {
         const result = await this.processImage(files[i], config);
         results.push({
           success: true,
@@ -1035,7 +1041,8 @@ class ImageProcessor {
 
         console.error("批量处理错误:", errorDetails);
 
-        const errorMessage = error instanceof Error ? error.message : '未知错误';
+        const errorMessage =
+          error instanceof Error ? error.message : "未知错误";
         results.push({
           success: false,
           file: files[i],
@@ -1051,11 +1058,14 @@ class ImageProcessor {
     return {
       canvasSupported: typeof HTMLCanvasElement !== "undefined",
       supportedFormats: this.getSupportedFormats(),
-      maxConcurrency: 1, 
+      maxConcurrency: 1,
     };
   }
 
-  async processImageChunked(file: File, config: ProcessImageConfig): Promise<ProcessedImage> {
+  async processImageChunked(
+    file: File,
+    config: ProcessImageConfig,
+  ): Promise<ProcessedImage> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = async (e: ProgressEvent<FileReader>) => {
@@ -1074,7 +1084,8 @@ class ImageProcessor {
             tempCanvas.width = chunkWidth;
             tempCanvas.height = chunkHeight;
             const tempCtx = tempCanvas.getContext("2d");
-            if (!tempCtx) throw new Error("Could not get 2d context for chunking");
+            if (!tempCtx)
+              throw new Error("Could not get 2d context for chunking");
             tempCtx.drawImage(img, 0, 0, chunkWidth, chunkHeight);
 
             const imageData = tempCtx.getImageData(
@@ -1109,7 +1120,12 @@ class ImageProcessor {
     });
   }
 
-  async processImageDataFromChunk(imageData: ImageData, config: ProcessImageConfig, fileName: string, originalSize: Dimensions): Promise<ProcessedImage> {
+  async processImageDataFromChunk(
+    imageData: ImageData,
+    config: ProcessImageConfig,
+    fileName: string,
+    originalSize: Dimensions,
+  ): Promise<ProcessedImage> {
     const { targetWidth, targetHeight, resizeMode } = config;
     const { originalWidth, originalHeight, width, height } = originalSize;
 
@@ -1125,7 +1141,7 @@ class ImageProcessor {
       resizeMode,
     );
 
-    if(!this.canvas) throw new Error("Canvas is not initialized.");
+    if (!this.canvas) throw new Error("Canvas is not initialized.");
 
     this.canvas.width = dimensions.width;
     this.canvas.height = dimensions.height;
@@ -1134,7 +1150,7 @@ class ImageProcessor {
     tempCanvas.width = origWidth;
     tempCanvas.height = origHeight;
     const tempCtx = tempCanvas.getContext("2d");
-    if(!tempCtx) throw new Error("Could not create temp canvas context.")
+    if (!tempCtx) throw new Error("Could not create temp canvas context.");
 
     const tempImg = await createImageBitmap(imageData);
     tempCtx.drawImage(tempImg, 0, 0, origWidth, origHeight);
@@ -1172,8 +1188,10 @@ class ImageProcessor {
   }
 
   getMemoryUsage(): MemoryInfo | null {
-    if (typeof performance === 'undefined' || !('memory' in performance)) return null;
-    const memory = (performance as Performance & { memory?: MemoryInfo }).memory;
+    if (typeof performance === "undefined" || !("memory" in performance))
+      return null;
+    const memory = (performance as Performance & { memory?: MemoryInfo })
+      .memory;
     if (!memory) return null;
     return {
       jsHeapSizeLimit: memory.jsHeapSizeLimit,
@@ -1194,7 +1212,7 @@ class ImageProcessor {
       this.clearCache();
 
       // 类型守卫：检查 gc 函数是否存在
-      if (typeof window.gc === 'function') {
+      if (typeof window.gc === "function") {
         window.gc();
       }
     }
@@ -1223,7 +1241,7 @@ class ImageProcessor {
     await this.cleanup();
     await this.warmup();
   }
-  
+
   isValidImageFile(file: File): boolean {
     const supportedTypes = [
       "image/jpeg",
@@ -1236,12 +1254,25 @@ class ImageProcessor {
 
     return supportedTypes.includes(file.type.toLowerCase());
   }
-  
-  isValidFileSize(file: File, maxSize = ImageProcessor.MAX_DIRECT_MEMORY_SIZE): boolean {
+
+  isValidFileSize(
+    file: File,
+    maxSize = FILE_SIZE_LIMITS.MAX_DIRECT_MEMORY,
+  ): boolean {
     return file.size <= maxSize;
   }
 
-  isValidImageDimensions(img: HTMLImageElement, limits: Partial<Dimensions & {maxWidth: number, maxHeight: number, minWidth: number, minHeight: number}> = {}): boolean {
+  isValidImageDimensions(
+    img: HTMLImageElement,
+    limits: Partial<
+      Dimensions & {
+        maxWidth: number;
+        maxHeight: number;
+        minWidth: number;
+        minHeight: number;
+      }
+    > = {},
+  ): boolean {
     const {
       maxWidth = ImageProcessor.MAX_DIMENSION,
       maxHeight = ImageProcessor.MAX_DIMENSION,
@@ -1268,7 +1299,10 @@ class ImageProcessor {
    *
    * @returns 所有操作的性能统计
    */
-  getPerformanceStats(): Record<string, import('./PerformanceMonitor').PerformanceStats> {
+  getPerformanceStats(): Record<
+    string,
+    import("./PerformanceMonitor").PerformanceStats
+  > {
     return performanceMonitor.getAllStats();
   }
 

@@ -1,6 +1,7 @@
 import { ref, type Ref } from "vue";
 import { ProcessImageConfig, ProcessedImage } from "../utils/ImageProcessor";
 import { ImageFile } from "./useFileUpload";
+import { logger } from "../utils/logger";
 
 /**
  * 图像处理 Composable
@@ -152,6 +153,7 @@ export function useImageProcessing(
 
   /**
    * 并发处理文件队列
+   * 使用局部索引参数传递，确保并发安全
    */
   const processConcurrently = async (
     files: ImageFile[],
@@ -159,27 +161,30 @@ export function useImageProcessing(
   ): Promise<ProcessedImage[]> => {
     const results: ProcessedImage[] = [];
     const processingPromises: Promise<void>[] = [];
-    let currentIndex = 0;
 
-    const processNext = async (): Promise<void> => {
-      if (
-        currentIndex >= files.length ||
-        isPaused.value ||
-        !processingController
-      ) {
+    // 使用原子递增的索引分配器，确保每个文件只被处理一次
+    let nextIndex = 0;
+    const getNextIndex = (): number => {
+      if (nextIndex >= files.length) return -1;
+      return nextIndex++;
+    };
+
+    const processAt = async (index: number): Promise<void> => {
+      // 检查是否应该停止
+      if (isPaused.value || !processingController) {
         return;
       }
 
-      const file = files[currentIndex++];
+      const file = files[index];
       const fileStartTime = Date.now();
 
       try {
         // 更新进度信息
         progress.value = {
           total: files.length,
-          processed: currentIndex - 1,
+          processed: index,
           currentFile: file.name,
-          percentage: Math.round(((currentIndex - 1) / files.length) * 100),
+          percentage: Math.round((index / files.length) * 100),
         };
 
         const result = await processFile(file, finalConfig);
@@ -198,16 +203,22 @@ export function useImageProcessing(
         file.status = "error";
         file.error = errorMessage;
 
-        console.error(`文件处理失败: ${file.name}`, err);
+        logger.error(`文件处理失败: ${file.name}`, err);
       }
 
-      // 继续处理下一个文件
-      await processNext();
+      // 获取下一个要处理的索引
+      const next = getNextIndex();
+      if (next !== -1) {
+        await processAt(next);
+      }
     };
 
-    // 启动并发处理
+    // 启动并发处理，每个并发任务独立获取下一个索引
     for (let i = 0; i < Math.min(concurrency, files.length); i++) {
-      processingPromises.push(processNext());
+      const initialIndex = getNextIndex();
+      if (initialIndex !== -1) {
+        processingPromises.push(processAt(initialIndex));
+      }
     }
 
     await Promise.all(processingPromises);
@@ -290,7 +301,7 @@ export function useImageProcessing(
             file.status = "error";
             file.error = errorMessage;
 
-            console.error(`文件处理失败: ${file.name}`, err);
+            logger.error(`文件处理失败: ${file.name}`, err);
           }
         }
       }

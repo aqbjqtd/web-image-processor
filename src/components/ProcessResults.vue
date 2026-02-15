@@ -634,21 +634,23 @@ const clearAll = (): void => {
 /**
  * 图片加载完成
  */
-const onImageLoad = (index: number): void => {
+const onImageLoad = (_index: number): void => {
   // 可以在这里处理图片加载完成的逻辑
 };
 
 /**
  * 图片加载错误
  */
-const onImageError = (index: number): void => {
+const onImageError = (_index: number): void => {
   // 可以在这里处理图片加载错误的逻辑
 };
 
 /**
  * 表格请求处理
  */
-const onTableRequest = (props: any): void => {
+const onTableRequest = (props: {
+  pagination: { page: number; rowsPerPage: number };
+}): void => {
   // 这里可以实现表格的分页逻辑
   currentPage.value = props.pagination.page;
 };

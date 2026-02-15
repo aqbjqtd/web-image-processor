@@ -1,4 +1,5 @@
-import { COMPRESSION_CONFIG, COMPLEXITY_CONFIG } from "./ImageConfig";
+import { COMPRESSION_CONFIG } from "./ImageConfig";
+import { logger } from "./logger";
 
 // 类型声明，避免 const 断言导致的类型问题
 export type QualityRange = 0.01 | 0.9 | 0.005 | 0.8 | 0.1;
@@ -62,7 +63,7 @@ export class CompressionEngine {
 
       // 如果初始质量就满足要求，直接返回
       if (currentSize <= maxSizeBytes) {
-        console.log(
+        logger.log(
           `初始质量 ${startQuality} 满足要求，大小: ${currentSize} bytes`,
         );
         return dataUrl;
@@ -73,7 +74,7 @@ export class CompressionEngine {
         currentSize,
         maxSizeBytes,
       );
-      console.log(`选择压缩策略: ${strategy}`);
+      logger.log(`选择压缩策略: ${strategy}`);
 
       switch (strategy) {
         case "binary_search":
@@ -103,11 +104,11 @@ export class CompressionEngine {
           return await this.fallbackCompression(canvas, maxSizeBytes);
       }
     } catch (error) {
-      console.error("图像压缩失败:", error);
+      logger.error("图像压缩失败:", error);
       return await this.fallbackCompression(canvas, targetSize);
     } finally {
       const processingTime = Date.now() - startTime;
-      console.log(`压缩完成，耗时: ${processingTime}ms`);
+      logger.log(`压缩完成，耗时: ${processingTime}ms`);
     }
   }
 
@@ -183,7 +184,7 @@ export class CompressionEngine {
         } else {
           maxQuality = midQuality;
         }
-      } catch (error) {
+      } catch (_error) {
         maxQuality = midQuality;
       }
     }
@@ -219,14 +220,13 @@ export class CompressionEngine {
         }
 
         // 自适应调整步长
-        const reductionRatio = currentSize / maxSizeBytes;
         const stepSize = Math.max(
           COMPRESSION_CONFIG.QUALITY_STEP,
           Math.min(0.1 as number, currentQuality * 0.1),
         );
 
         currentQuality -= stepSize;
-      } catch (error) {
+      } catch (_error) {
         currentQuality -= COMPRESSION_CONFIG.QUALITY_STEP;
       }
     }
@@ -244,8 +244,7 @@ export class CompressionEngine {
     startQuality: number,
   ): Promise<string | null> {
     const formats = ["image/webp", "image/jpeg", "image/png"] as const;
-    const results: Array<{ format: string; dataUrl: string; size: number }> =
-      [];
+    const results: Array<{ format: string; dataUrl: string; size: number }> = [];
 
     // 尝试多种格式
     for (const format of formats) {
@@ -262,14 +261,14 @@ export class CompressionEngine {
           results.push({ format, dataUrl, size });
         }
       } catch (error) {
-        console.warn(`格式 ${format} 压缩失败:`, error);
+        logger.warn(`格式 ${format} 压缩失败:`, error);
       }
     }
 
     // 选择最佳结果（最小文件大小）
     if (results.length > 0) {
-      results.sort((a, b) => a.size - b.size);
-      console.log(
+      results.sort((a: { size: number }, b: { size: number }) => a.size - b.size);
+      logger.log(
         `最佳格式: ${results[0].format}, 大小: ${results[0].size} bytes`,
       );
       return results[0].dataUrl;
@@ -290,9 +289,9 @@ export class CompressionEngine {
    */
   private async fallbackCompression(
     canvas: HTMLCanvasElement,
-    maxSizeBytes: number,
+    _maxSizeBytes: number,
   ): Promise<string | null> {
-    console.log("使用降级压缩方案");
+    logger.log("使用降级压缩方案");
 
     // 使用最低质量和最兼容的格式
     try {
@@ -303,13 +302,13 @@ export class CompressionEngine {
       );
       return dataUrl;
     } catch (error) {
-      console.error("降级压缩也失败:", error);
+      logger.error("降级压缩也失败:", error);
 
       // 最后的尝试：使用 PNG 格式
       try {
         return await this.tryCompression(canvas, "image/png", 0.9);
       } catch (fallbackError) {
-        console.error("所有压缩方法都失败:", fallbackError);
+        logger.error("所有压缩方法都失败:", fallbackError);
         return null;
       }
     }
@@ -322,7 +321,7 @@ export class CompressionEngine {
   async batchOptimize(
     images: Array<{ canvas: HTMLCanvasElement; name: string }>,
     targetSize: number,
-    format?: string,
+    format?: "image/jpeg" | "image/png" | "image/webp",
   ): Promise<CompressionResult[]> {
     const results: CompressionResult[] = [];
 
@@ -337,18 +336,18 @@ export class CompressionEngine {
       const initialSize = this.getDataUrlSize(initialDataUrl);
       const strategy = this.selectCompressionStrategy(initialSize, targetSize);
 
-      console.log(`批量压缩策略: ${strategy}`);
+      logger.log(`批量压缩策略: ${strategy}`);
     }
 
     // 并行处理所有图像
-    const promises = images.map(async (image, index) => {
+    const promises = images.map(async (image, _index) => {
       const startTime = Date.now();
 
       try {
         const optimizedDataUrl = await this.optimizeImageQuality(
           image.canvas,
           targetSize,
-          (format as any) || "image/jpeg",
+          format || "image/jpeg",
         );
 
         if (optimizedDataUrl) {
@@ -369,7 +368,7 @@ export class CompressionEngine {
 
         return null;
       } catch (error) {
-        console.error(`图像 ${image.name} 压缩失败:`, error);
+        logger.error(`图像 ${image.name} 压缩失败:`, error);
         return null;
       }
     });
@@ -480,7 +479,7 @@ export class CompressionEngine {
 
       return null;
     } catch (error) {
-      console.error(`预设压缩失败 (${preset}):`, error);
+      logger.error(`预设压缩失败 (${preset}):`, error);
       return null;
     }
   }

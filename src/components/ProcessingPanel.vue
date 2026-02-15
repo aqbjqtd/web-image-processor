@@ -224,7 +224,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, watch } from "vue";
 import { ProcessImageConfig } from "../utils/ImageProcessor";
 import { useErrorHandler } from "../composables/useErrorHandler";
 
@@ -247,7 +247,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<Emits>();
 
 // 错误处理
-const { handleError } = useErrorHandler();
+useErrorHandler();
 
 // 本地配置
 const localConfig = ref<ProcessImageConfig>({ ...props.modelValue });

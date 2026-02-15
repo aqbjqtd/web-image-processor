@@ -1,5 +1,6 @@
 import { ref } from "vue";
 import { useQuasar } from "quasar";
+import { logger } from "../utils/logger";
 
 /**
  * 错误处理 Composable
@@ -278,7 +279,7 @@ export function useErrorHandler(
     }
 
     if (enableConsoleLog) {
-      console.log(`[SUCCESS] ${formatErrorMessage(message, context)}`);
+      logger.log(`[SUCCESS] ${formatErrorMessage(message, context)}`);
     }
   };
 
@@ -294,7 +295,7 @@ export function useErrorHandler(
     }
 
     if (enableConsoleLog) {
-      console.warn(`[WARNING] ${formatErrorMessage(message, context)}`);
+      logger.warn(`[WARNING] ${formatErrorMessage(message, context)}`);
     }
   };
 
@@ -307,7 +308,7 @@ export function useErrorHandler(
     }
 
     if (enableConsoleLog) {
-      console.log(`[INFO] ${formatErrorMessage(message, context)}`);
+      logger.log(`[INFO] ${formatErrorMessage(message, context)}`);
     }
   };
 

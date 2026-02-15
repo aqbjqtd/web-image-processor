@@ -1,4 +1,5 @@
 // src/utils/PerformanceMonitor.ts
+import { logger } from "./logger";
 
 /**
  * 性能统计结果接口
@@ -29,7 +30,7 @@ export interface PerformanceStats {
  *
  * // 获取统计
  * const stats = performanceMonitor.getStats('processImage');
- * console.log(`平均耗时: ${stats.avg}ms`);
+ * logger.log(`平均耗时: ${stats.avg}ms`);
  * ```
  */
 export class PerformanceMonitor {
@@ -112,39 +113,39 @@ export class PerformanceMonitor {
     if (operation) {
       const stats = this.getStats(operation);
       if (!stats) {
-        console.log(`[PerformanceMonitor] 操作 "${operation}" 没有统计数据`);
+        logger.log(`[PerformanceMonitor] 操作 "${operation}" 没有统计数据`);
         return;
       }
 
-      console.log(`[PerformanceMonitor] 操作 "${operation}" 统计:`);
-      console.log(`  次数: ${stats.count}`);
-      console.log(`  平均: ${stats.avg.toFixed(2)}ms`);
-      console.log(`  最小: ${stats.min.toFixed(2)}ms`);
-      console.log(`  最大: ${stats.max.toFixed(2)}ms`);
-      console.log(`  P95: ${stats.p95.toFixed(2)}ms`);
+      logger.log(`[PerformanceMonitor] 操作 "${operation}" 统计:`);
+      logger.log(`  次数: ${stats.count}`);
+      logger.log(`  平均: ${stats.avg.toFixed(2)}ms`);
+      logger.log(`  最小: ${stats.min.toFixed(2)}ms`);
+      logger.log(`  最大: ${stats.max.toFixed(2)}ms`);
+      logger.log(`  P95: ${stats.p95.toFixed(2)}ms`);
     } else {
       const allStats = this.getAllStats();
       const operations = Object.keys(allStats);
 
       if (operations.length === 0) {
-        console.log('[PerformanceMonitor] 没有统计数据');
+        logger.log('[PerformanceMonitor] 没有统计数据');
         return;
       }
 
-      console.log('[PerformanceMonitor] 性能统计报告:');
-      console.log('================================');
+      logger.log('[PerformanceMonitor] 性能统计报告:');
+      logger.log('================================');
 
       for (const op of operations) {
         const stats = allStats[op];
-        console.log(`\n操作: ${op}`);
-        console.log(`  次数: ${stats.count}`);
-        console.log(`  平均: ${stats.avg.toFixed(2)}ms`);
-        console.log(`  最小: ${stats.min.toFixed(2)}ms`);
-        console.log(`  最大: ${stats.max.toFixed(2)}ms`);
-        console.log(`  P95: ${stats.p95.toFixed(2)}ms`);
+        logger.log(`\n操作: ${op}`);
+        logger.log(`  次数: ${stats.count}`);
+        logger.log(`  平均: ${stats.avg.toFixed(2)}ms`);
+        logger.log(`  最小: ${stats.min.toFixed(2)}ms`);
+        logger.log(`  最大: ${stats.max.toFixed(2)}ms`);
+        logger.log(`  P95: ${stats.p95.toFixed(2)}ms`);
       }
 
-      console.log('\n================================');
+      logger.log('\n================================');
     }
   }
 }

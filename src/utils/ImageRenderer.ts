@@ -1,3 +1,5 @@
+import { logger } from "./logger";
+
 /**
  * 图像渲染工具类 - 统一的图像绘制逻辑
  * 消除 ImageProcessor 和 imageWorker 中的代码重复
@@ -52,7 +54,7 @@ export class ImageRenderer {
         break;
 
       default:
-        console.warn(`未知的绘制模式: ${mode}，使用默认拉伸模式`);
+        logger.warn(`未知的绘制模式: ${mode}，使用默认拉伸模式`);
         context.drawImage(image, 0, 0, canvasWidth, canvasHeight);
         break;
     }

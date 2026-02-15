@@ -1,5 +1,7 @@
 import { ref, computed, type Ref } from "vue";
+import { useQuasar } from "quasar";
 import { ProcessedImage } from "../utils/ImageProcessor";
+import { logger } from "../utils/logger";
 
 /**
  * 文件上传 Composable
@@ -82,6 +84,9 @@ export interface UseFileUploadReturn {
 export function useFileUpload(
   options: UseFileUploadOptions = {},
 ): UseFileUploadReturn {
+  // Quasar 通知插件
+  const $q = useQuasar();
+
   // 默认配置
   const {
     maxFileSize = 50 * 1024 * 1024, // 50MB
@@ -161,8 +166,14 @@ export function useFileUpload(
         // 异步生成预览
         generatePreview(imageFile);
       } else {
-        console.warn("文件验证失败:", validation.error);
-        // TODO: 可以通过通知显示错误
+        // 使用 Quasar Notify 显示错误
+        $q.notify({
+          type: "negative",
+          message: validation.error || "文件验证失败",
+          position: "top",
+          timeout: 3000,
+          actions: [{ label: "关闭", color: "white" }],
+        });
       }
     }
 
@@ -184,7 +195,7 @@ export function useFileUpload(
       };
       reader.readAsDataURL(file);
     } catch (error) {
-      console.warn("生成预览失败:", error);
+      logger.warn("生成预览失败:", error);
     }
   };
 
@@ -193,12 +204,9 @@ export function useFileUpload(
    */
   const removeFile = (index: number): void => {
     if (index >= 0 && index < files.value.length) {
-      // 清理预览URL
-      const file = files.value[index];
-      if (file.preview) {
-        URL.revokeObjectURL(file.preview);
-      }
-
+      // 注意：file.preview 是 base64 dataURL，由 FileReader 生成
+      // 不需要使用 URL.revokeObjectURL 清理
+      // Blob URL 才需要使用 URL.revokeObjectURL 清理
       files.value.splice(index, 1);
     }
   };
@@ -207,13 +215,9 @@ export function useFileUpload(
    * 清空所有文件
    */
   const clearFiles = (): void => {
-    // 清理所有预览URL
-    files.value.forEach((file) => {
-      if (file.preview) {
-        URL.revokeObjectURL(file.preview);
-      }
-    });
-
+    // 注意：file.preview 是 base64 dataURL，由 FileReader 生成
+    // 不需要使用 URL.revokeObjectURL 清理
+    // Blob URL 才需要使用 URL.revokeObjectURL 清理
     files.value = [];
   };
 

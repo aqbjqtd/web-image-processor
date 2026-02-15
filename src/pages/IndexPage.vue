@@ -302,7 +302,8 @@
 import { ref, onMounted, onBeforeUnmount } from "vue";
 import { useQuasar } from "quasar";
 import imageProcessor from "../utils/ImageProcessor.ts";
-import type { ProcessedImage } from "../utils/ImageProcessor.ts";
+import type { ProcessedImage } from "../utils/ImageProcessor";
+import { logger } from "../utils/logger";
 
 const $q = useQuasar();
 
@@ -527,7 +528,7 @@ const startProcessing = async (): Promise<void> => {
           : error,
     };
 
-    console.error("图像处理错误:", errorDetails);
+    logger.error("图像处理错误:", errorDetails);
 
     $q.notify({
       type: "negative",
@@ -645,7 +646,7 @@ onMounted(async () => {
       timeout: 2000,
     });
   } catch (error) {
-    console.warn("处理器预热失败:", error);
+    logger.warn("处理器预热失败:", error);
   }
 });
 

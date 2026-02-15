@@ -260,7 +260,6 @@ const emit = defineEmits<Emits>();
 // 响应式数据
 const currentPage = ref(1);
 const selectedIndex = ref<number | null>(null);
-const viewMode = ref(props.defaultView);
 
 // 全屏预览对话框
 const fullscreenDialog = ref({
@@ -283,7 +282,7 @@ const detailsDialog = ref({
 const displayImages = computed(() => {
   return props.images
     .slice(startIndex.value, endIndex.value)
-    .map((image, index) => ({
+    .map((image) => ({
       ...image,
       loading: true,
       error: false,
@@ -359,8 +358,8 @@ const showDetails = (index: number): void => {
 /**
  * 图片加载成功
  */
-const onImageLoad = (index: number): void => {
-  const displayImage = displayImages.value[index];
+const onImageLoad = (): void => {
+  const displayImage = displayImages.value[0];
   if (displayImage) {
     displayImage.loading = false;
   }
@@ -369,29 +368,12 @@ const onImageLoad = (index: number): void => {
 /**
  * 图片加载失败
  */
-const onImageError = (index: number): void => {
-  const displayImage = displayImages.value[index];
+const onImageError = (): void => {
+  const displayImage = displayImages.value[0];
   if (displayImage) {
     displayImage.loading = false;
     displayImage.error = true;
   }
-};
-
-/**
- * 下载图片
- */
-const downloadImage = (index: number): void => {
-  const actualIndex = startIndex.value + index;
-  const image = props.images[actualIndex];
-
-  const link = document.createElement("a");
-  link.href = image.dataUrl;
-  link.download = image.name;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-
-  emit("image-download", actualIndex, image);
 };
 
 // 监听页码变化
@@ -410,7 +392,7 @@ watch(
 
 // 监听当前页变化，重置加载状态
 watch(displayImages, (newImages) => {
-  newImages.forEach((image, index) => {
+  newImages.forEach((image) => {
     if (!image.error) {
       image.loading = true;
     }

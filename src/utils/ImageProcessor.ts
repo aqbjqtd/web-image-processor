@@ -1,13 +1,28 @@
 // src/utils/ImageProcessor.ts
 import performanceMonitor from "./PerformanceMonitor";
 import { ImageRenderer } from "./ImageRenderer";
+import { logger } from "./logger";
 import {
   FILE_SIZE_LIMITS,
   COMPLEXITY_CONFIG,
-  COMPRESSION_CONFIG,
   IMAGE_FORMATS,
   ImageFormat,
 } from "./ImageConfig";
+import { optimizeCompression, COMPRESSION_CONFIG } from "./CompressionLogic";
+import {
+  DEFAULT_FILE_SIZE,
+  DIMENSION_LIMITS,
+  MEMORY_THRESHOLDS,
+  COMPLEXITY_SCORE,
+  IMAGE_ANALYSIS,
+  BINARY_SEARCH,
+  SCALE_PARAMS,
+  QUALITY_RECOMMENDATION,
+  COMPLEXITY_WEIGHTS,
+  BATCH_PROCESSING,
+  PERFORMANCE,
+  CACHE_CONFIG,
+} from "./constants";
 
 export interface BatchProcessResult {
   success: boolean;
@@ -81,24 +96,54 @@ export interface MemoryInfo {
   usedJSHeapSize: number;
 }
 
+/**
+ * 图像处理引擎（单例模式）
+ *
+ * 提供完整的图像处理功能，包括：
+ * - 智能压缩（基于图像复杂度的自适应质量优化）
+ * - 多种调整模式（保持比例填充/裁剪、拉伸）
+ * - 格式智能选择（JPEG/PNG/WebP）
+ * - 批量处理（串行模式，确保稳定性）
+ * - 缓存机制（避免重复压缩）
+ * - 内存管理（自动清理和监控）
+ *
+ * @example
+ * ```typescript
+ * import imageProcessor from './utils/ImageProcessor';
+ *
+ * // 处理单张图片
+ * const result = await imageProcessor.processImage(file, {
+ *   resizeOption: 'custom',
+ *   targetWidth: 1920,
+ *   targetHeight: 1080,
+ *   resizeMode: 'keep_ratio_pad',
+ *   maxFileSize: 500,
+ * });
+ *
+ * // 批量处理
+ * const results = await imageProcessor.batchProcessImages(files, config, (progress) => {
+ *   logger.log(`处理进度: ${progress.progress * 100}%`);
+ * });
+ * ```
+ */
 class ImageProcessor {
   // ========== 配置常量导入 ==========
   // 所有配置常量已移至 ImageConfig.ts
 
   // 缓存
-  private static readonly MAX_CACHE_SIZE = 50;
+  private static readonly MAX_CACHE_SIZE = CACHE_CONFIG.MAX_SIZE;
 
   // 内存管理
-  private static readonly MEMORY_CLEANUP_THRESHOLD = 0.85; // 85%
+  private static readonly MEMORY_CLEANUP_THRESHOLD = MEMORY_THRESHOLDS.CLEANUP_RATIO;
 
   // 格式选择
-  private static readonly WEBP_QUALITY_THRESHOLD = 0.85;
-  private static readonly PHOTO_IMAGE_THRESHOLD = 0.6;
-  private static readonly PNG_SIZE_THRESHOLD = 300; // KB
+  private static readonly WEBP_QUALITY_THRESHOLD = MEMORY_THRESHOLDS.CLEANUP_RATIO;
+  private static readonly PHOTO_IMAGE_THRESHOLD = COMPLEXITY_SCORE.LOW_THRESHOLD;
+  private static readonly PNG_SIZE_THRESHOLD = FILE_SIZE_LIMITS.MIN * 6; // KB (50 * 6 = 300)
 
   // 图像尺寸限制
-  private static readonly MAX_DIMENSION = 8192;
-  private static readonly MIN_DIMENSION = 1;
+  private static readonly MAX_DIMENSION = DIMENSION_LIMITS.MAX;
+  private static readonly MIN_DIMENSION = DIMENSION_LIMITS.MIN;
 
   // 实例属性
   private canvas: HTMLCanvasElement | null = null;
@@ -322,7 +367,7 @@ class ImageProcessor {
     context: CanvasRenderingContext2D | null = this.ctx,
   ): void {
     if (!context) {
-      console.warn("绘制上下文为空，无法绘制图像");
+      logger.warn("绘制上下文为空，无法绘制图像");
       return;
     }
 
@@ -495,8 +540,11 @@ class ImageProcessor {
     const colorComplexityRatio = uniqueColors / pixelCount;
 
     const complexityScore = Math.min(
-      1,
-      (avgVariance / 1000) * 0.4 + edgeRatio * 0.3 + colorComplexityRatio * 0.3,
+      COMPLEXITY_SCORE.MAX,
+      (avgVariance / COMPLEXITY_WEIGHTS.VARIANCE_DIVISOR) *
+        COMPLEXITY_WEIGHTS.VARIANCE +
+        edgeRatio * COMPLEXITY_WEIGHTS.EDGE +
+        colorComplexityRatio * COMPLEXITY_WEIGHTS.COLOR,
     );
 
     return {
@@ -505,20 +553,25 @@ class ImageProcessor {
       uniqueColors,
       colorComplexityRatio,
       complexityScore,
-      recommendedStartQuality: Math.max(0.3, 0.95 - complexityScore * 0.4),
+      recommendedStartQuality: Math.max(
+        QUALITY_RECOMMENDATION.MIN_START,
+        QUALITY_RECOMMENDATION.MAX_START -
+          complexityScore * QUALITY_RECOMMENDATION.COMPLEXITY_FACTOR,
+      ),
     };
   }
 
   selectOptimalFormat(
     img: HTMLImageElement,
     complexity: ComplexityResult,
-    maxFileSize: number = 1000,
+    maxFileSize: number = DEFAULT_FILE_SIZE,
   ): OptimalFormatResult {
     const hasTransparency = this.checkTransparency(img);
     const isPhotographic =
       complexity.complexityScore > ImageProcessor.PHOTO_IMAGE_THRESHOLD;
     const isSimpleGraphic =
-      complexity.uniqueColors < 256 && complexity.edgeRatio < 0.1;
+      complexity.uniqueColors < IMAGE_ANALYSIS.UNIQUE_COLORS_LOW &&
+      complexity.edgeRatio < IMAGE_ANALYSIS.EDGE_RATIO_LOW;
 
     let recommendedFormats: Array<"image/png" | "image/webp" | "image/jpeg"> =
       [];
@@ -568,7 +621,7 @@ class ImageProcessor {
   }
 
   checkTransparency(img: HTMLImageElement): boolean {
-    const sampleSize = 50;
+    const sampleSize = IMAGE_ANALYSIS.SAMPLE_SIZE;
     const testCanvas = document.createElement("canvas");
     testCanvas.width = sampleSize;
     testCanvas.height = sampleSize;
@@ -600,7 +653,7 @@ class ImageProcessor {
         formats.push("image/webp");
       }
     } catch {
-      console.warn("WebP支持检测失败");
+      logger.warn("WebP支持检测失败");
     }
     return formats;
   }
@@ -669,119 +722,6 @@ class ImageProcessor {
     }
 
     return { format: selectedFormat, quality };
-  }
-
-  /**
-   * 使用二分查找优化压缩质量
-   */
-  private async optimizeWithBinarySearch(
-    maxFileSize: number,
-    img: HTMLImageElement | null,
-    config: Partial<ProcessImageConfig>,
-    canvas: HTMLCanvasElement,
-    format: "image/jpeg" | "image/png" | "image/webp",
-    startQuality: number,
-  ): Promise<string | null> {
-    const maxSizeBytes = maxFileSize * 1024;
-    let dataUrl: string;
-
-    // 尝试初始质量
-    try {
-      dataUrl = canvas.toDataURL(format, startQuality);
-    } catch (error) {
-      console.warn("Canvas压缩失败，使用降级方案:", error);
-      // 降级到默认质量和格式
-      dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-    }
-    let currentSize = this.getDataUrlSize(dataUrl);
-
-    // 如果初始质量就满足要求，直接返回
-    if (currentSize <= maxSizeBytes) {
-      this.saveToCacheIfNeeded(img, config, canvas, maxFileSize, dataUrl);
-      return dataUrl;
-    }
-
-    // 二分查找优化
-    let minQuality = COMPRESSION_CONFIG.MIN_QUALITY;
-    let maxQuality = COMPRESSION_CONFIG.INITIAL_QUALITY;
-    let bestDataUrl: string | null = null;
-
-    let iterationCount = 0;
-    while (maxQuality - minQuality > COMPRESSION_CONFIG.QUALITY_STEP) {
-      iterationCount++;
-      if (iterationCount > COMPRESSION_CONFIG.MAX_ITERATIONS) break;
-
-      // 根据当前文件大小调整质量比例
-      let qualityRatio = 0.5;
-      if (currentSize > maxSizeBytes * 1.5) {
-        qualityRatio = 0.3;
-      } else if (currentSize < maxSizeBytes * 0.8) {
-        qualityRatio = 0.7;
-      }
-
-      const quality = minQuality + (maxQuality - minQuality) * qualityRatio;
-
-      try {
-        dataUrl = canvas.toDataURL(format, quality);
-      } catch (error) {
-        console.warn("Canvas压缩失败，使用降级方案:", error);
-        dataUrl = canvas.toDataURL(
-          COMPRESSION_CONFIG.DEFAULT_FORMAT,
-          COMPRESSION_CONFIG.FALLBACK_QUALITY,
-        );
-      }
-      currentSize = this.getDataUrlSize(dataUrl);
-
-      if (currentSize <= maxSizeBytes) {
-        bestDataUrl = dataUrl;
-        (minQuality as number) = quality;
-      } else {
-        (maxQuality as number) = quality;
-      }
-    }
-
-    if (bestDataUrl && this.getDataUrlSize(bestDataUrl) <= maxSizeBytes) {
-      this.saveToCacheIfNeeded(img, config, canvas, maxFileSize, bestDataUrl);
-      return bestDataUrl;
-    }
-
-    return null;
-  }
-
-  /**
-   * 线性搜索降级方案
-   */
-  private async linearSearchFallback(
-    maxFileSize: number,
-    img: HTMLImageElement | null,
-    config: Partial<ProcessImageConfig>,
-    canvas: HTMLCanvasElement,
-    format: "image/jpeg" | "image/png" | "image/webp",
-    startQuality: number,
-  ): Promise<string | null> {
-    const maxSizeBytes = maxFileSize * 1024;
-    let dataUrl: string;
-    let currentSize: number;
-
-    for (
-      let q = startQuality;
-      q >= COMPRESSION_CONFIG.MIN_QUALITY;
-      q -= COMPRESSION_CONFIG.QUALITY_STEP
-    ) {
-      try {
-        dataUrl = canvas.toDataURL(format, q);
-      } catch {
-        dataUrl = canvas.toDataURL(format, q);
-      }
-      currentSize = this.getDataUrlSize(dataUrl);
-
-      if (currentSize <= maxSizeBytes) {
-        this.saveToCacheIfNeeded(img, config, canvas, maxFileSize, dataUrl);
-        return dataUrl;
-      }
-    }
-
-    return null;
   }
 
   /**
@@ -866,7 +806,7 @@ class ImageProcessor {
     }
 
     if (maxFileSize > FILE_SIZE_LIMITS.MAX) {
-      console.warn(
+      logger.warn(
         `目标文件大小 ${maxFileSize}KB 超过推荐最大值 ${FILE_SIZE_LIMITS.MAX}KB，可能导致处理失败`,
       );
     }
@@ -881,35 +821,18 @@ class ImageProcessor {
       maxFileSize,
     );
 
-    // 3. 二分查找优化
-    const binarySearchResult = await this.optimizeWithBinarySearch(
-      maxFileSize,
-      img,
-      config,
+    // 3. 使用共享压缩逻辑模块
+    const result = await optimizeCompression(
       canvas,
+      maxFileSize,
       format,
       startQuality,
     );
 
-    if (binarySearchResult) return binarySearchResult;
+    // 4. 保存到缓存
+    this.saveToCacheIfNeeded(img, config, canvas, maxFileSize, result.dataUrl);
 
-    // 4. 线性搜索降级
-    const linearSearchResult = await this.linearSearchFallback(
-      maxFileSize,
-      img,
-      config,
-      canvas,
-      format,
-      startQuality,
-    );
-
-    if (linearSearchResult) return linearSearchResult;
-
-    // 5. 最终降级：尺寸缩减
-    const finalResult = await this.fallbackSizeReduction(maxFileSize * 1024);
-    this.saveToCacheIfNeeded(img, config, canvas, maxFileSize, finalResult);
-
-    return finalResult;
+    return result.dataUrl;
   }
 
   async fallbackSizeReduction(maxSizeBytes: number): Promise<string> {
@@ -917,9 +840,13 @@ class ImageProcessor {
     const originalWidth = this.canvas.width;
     const originalHeight = this.canvas.height;
 
-    for (let scale = 0.9; scale >= 0.1; scale -= 0.1) {
-      const newWidth = Math.max(1, Math.round(originalWidth * scale));
-      const newHeight = Math.max(1, Math.round(originalHeight * scale));
+    for (
+      let scale = SCALE_PARAMS.START;
+      scale >= SCALE_PARAMS.END;
+      scale -= SCALE_PARAMS.STEP
+    ) {
+      const newWidth = Math.max(DIMENSION_LIMITS.MIN, Math.round(originalWidth * scale));
+      const newHeight = Math.max(DIMENSION_LIMITS.MIN, Math.round(originalHeight * scale));
 
       const tempCanvas = document.createElement("canvas");
       tempCanvas.width = newWidth;
@@ -932,7 +859,11 @@ class ImageProcessor {
 
       tempCtx.drawImage(this.canvas, 0, 0, newWidth, newHeight);
 
-      for (let q = 0.9; q >= 0.01; q -= 0.1) {
+      for (
+        let q = BINARY_SEARCH.MAX_QUALITY;
+        q >= BINARY_SEARCH.MIN_QUALITY;
+        q -= BINARY_SEARCH.QUALITY_STEP
+      ) {
         const dataUrl = tempCanvas.toDataURL("image/jpeg", q);
         if (this.getDataUrlSize(dataUrl) <= maxSizeBytes) {
           return dataUrl;
@@ -1017,7 +948,7 @@ class ImageProcessor {
           timestamp: new Date().toISOString(),
           file: {
             name: files[i].name,
-            size: `${(files[i].size / 1024).toFixed(2)}KB`,
+            size: `${(files[i].size / BATCH_PROCESSING.DISPLAY_SIZE_UNIT).toFixed(2)}KB`,
             type: files[i].type,
             lastModified: new Date(files[i].lastModified).toISOString(),
           },
@@ -1039,7 +970,7 @@ class ImageProcessor {
               : error,
         };
 
-        console.error("批量处理错误:", errorDetails);
+        logger.error("批量处理错误:", errorDetails);
 
         const errorMessage =
           error instanceof Error ? error.message : "未知错误";
@@ -1206,8 +1137,8 @@ class ImageProcessor {
 
     const memoryUsageRatio = memory.usedJSHeapSize / memory.jsHeapSizeLimit;
     if (memoryUsageRatio > ImageProcessor.MEMORY_CLEANUP_THRESHOLD) {
-      console.warn(
-        `高内存使用率 (${(memoryUsageRatio * 100).toFixed(2)}%)，正在清理缓存...`,
+      logger.warn(
+        `高内存使用率 (${(memoryUsageRatio * PERFORMANCE.MEMORY_MULTIPLIER).toFixed(2)}%)，正在清理缓存...`,
       );
       this.clearCache();
 
@@ -1221,9 +1152,9 @@ class ImageProcessor {
   async warmup(): Promise<void> {
     try {
       this.initCanvas();
-      console.log("图像处理引擎预热完成");
+      logger.log("图像处理引擎预热完成");
     } catch (error) {
-      console.warn("图像处理引擎预热失败:", error);
+      logger.warn("图像处理引擎预热失败:", error);
     }
   }
 
@@ -1231,9 +1162,9 @@ class ImageProcessor {
     try {
       this.canvas = null;
       this.ctx = null;
-      console.log("图像处理器资源已清理");
+      logger.log("图像处理器资源已清理");
     } catch (error) {
-      console.error("清理图像处理器资源时出错:", error);
+      logger.error("清理图像处理器资源时出错:", error);
     }
   }
 

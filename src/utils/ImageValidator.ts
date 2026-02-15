@@ -38,7 +38,7 @@ export interface ValidationError {
   /** 错误消息 */
   message: string;
   /** 错误值 */
-  value?: any;
+  value?: unknown;
   /** 严重级别 */
   severity: "critical" | "error" | "warning";
 }
@@ -54,7 +54,7 @@ export interface ValidationWarning {
   /** 警告消息 */
   message: string;
   /** 警告值 */
-  value?: any;
+  value?: unknown;
 }
 
 /**
@@ -68,7 +68,7 @@ export interface ValidationSuggestion {
   /** 建议消息 */
   message: string;
   /** 建议值 */
-  suggestedValue?: any;
+  suggestedValue?: unknown;
 }
 
 /**
@@ -84,14 +84,6 @@ export interface FileValidationConfig {
   /** 最大文件名长度 */
   maxFileNameLength?: number;
 }
-
-// 类型声明，避免 const 断言导致的类型问题
-type AllowedFileTypeStrings =
-  | "image/jpeg"
-  | "image/png"
-  | "image/webp"
-  | "image/gif"
-  | "image/bmp";
 
 // 用于类型转换的辅助函数
 const asAllowedType = (type: string): AllowedFileType => {
@@ -257,9 +249,10 @@ export class ImageValidator {
       maxHeight = SIZE_LIMITS.MAX_HEIGHT,
       minWidth = SIZE_LIMITS.MIN_WIDTH,
       minHeight = SIZE_LIMITS.MIN_HEIGHT,
-      allowTransparency = true,
       validatePixelRatio = true,
     } = config;
+
+    // allowTransparency 在后续验证中使用（第389行）
 
     // 验证图像尺寸
     if (image.width > maxWidth) {

@@ -1,13 +1,6 @@
 import { MEMORY_CONFIG } from "./ImageConfig";
-import { ProcessedImage } from "./ImageProcessor";
-
-// 类型声明，避免 const 断言导致的类型问题
-type MemoryConfigType = {
-  CLEANUP_THRESHOLD: number;
-  MAX_CACHE_SIZE: number;
-  MEMORY_CHECK_INTERVAL: number;
-  HEAP_THRESHOLD: number;
-};
+import { ProcessedImage, ProcessImageConfig } from "./ImageProcessor";
+import { logger } from "./logger";
 
 /**
  * 缓存条目接口
@@ -50,7 +43,7 @@ export class CacheManager {
    */
   private generateKey(
     fileName: string,
-    config: any,
+    config: ProcessImageConfig,
     targetWidth: number,
     targetHeight: number,
   ): string {
@@ -61,7 +54,7 @@ export class CacheManager {
   /**
    * 对象哈希
    */
-  private hashObject(obj: any): string {
+  private hashObject(obj: ProcessImageConfig): string {
     const str = JSON.stringify(obj, Object.keys(obj).sort());
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
@@ -109,7 +102,7 @@ export class CacheManager {
 
     // 基于内存使用量的清理
     if (this.currentMemoryUsage > this.memoryThreshold) {
-      console.warn(
+      logger.warn(
         `内存使用量 ${this.currentMemoryUsage} 超过阈值 ${this.memoryThreshold}，开始清理缓存`,
       );
       return true;
@@ -117,7 +110,7 @@ export class CacheManager {
 
     // 基于缓存数量的清理
     if (this.cache.size > this.maxCacheSize) {
-      console.warn(
+      logger.warn(
         `缓存数量 ${this.cache.size} 超过最大值 ${this.maxCacheSize}，开始清理缓存`,
       );
       return true;
@@ -155,7 +148,7 @@ export class CacheManager {
       this.evictionCount++;
     }
 
-    console.log(
+    logger.log(
       `清理了 ${clearedCount} 个缓存条目，释放 ${clearedCount} bytes 内存`,
     );
   }
@@ -165,7 +158,7 @@ export class CacheManager {
    */
   get(
     fileName: string,
-    config: any,
+    config: ProcessImageConfig,
     targetWidth: number,
     targetHeight: number,
   ): ProcessedImage | null {
@@ -189,7 +182,7 @@ export class CacheManager {
    */
   set(
     fileName: string,
-    config: any,
+    config: ProcessImageConfig,
     targetWidth: number,
     targetHeight: number,
     data: ProcessedImage,
@@ -219,7 +212,7 @@ export class CacheManager {
    */
   has(
     fileName: string,
-    config: any,
+    config: ProcessImageConfig,
     targetWidth: number,
     targetHeight: number,
   ): boolean {
@@ -232,7 +225,7 @@ export class CacheManager {
    */
   delete(
     fileName: string,
-    config: any,
+    config: ProcessImageConfig,
     targetWidth: number,
     targetHeight: number,
   ): boolean {
@@ -255,7 +248,7 @@ export class CacheManager {
     this.hitCount = 0;
     this.missCount = 0;
     this.evictionCount = 0;
-    console.log("缓存已清空");
+    logger.log("缓存已清空");
   }
 
   /**
@@ -311,12 +304,12 @@ export class CacheManager {
   async preload(
     configs: Array<{
       fileName: string;
-      config: any;
+      config: ProcessImageConfig;
       targetWidth: number;
       targetHeight: number;
     }>,
   ): Promise<void> {
-    console.log(`开始预热缓存，${configs.length} 个配置`);
+    logger.log(`开始预热缓存，${configs.length} 个配置`);
 
     for (const config of configs) {
       if (
@@ -327,15 +320,15 @@ export class CacheManager {
           config.targetHeight,
         )
       ) {
-        console.log(`跳过已缓存: ${config.fileName}`);
+        logger.log(`跳过已缓存: ${config.fileName}`);
         continue;
       }
 
       // 这里可以添加预热逻辑，比如预先生成缓存条目
-      console.log(`预热缓存: ${config.fileName}`);
+      logger.log(`预热缓存: ${config.fileName}`);
     }
 
-    console.log("缓存预热完成");
+    logger.log("缓存预热完成");
   }
 
   /**
@@ -362,7 +355,7 @@ export class CacheManager {
     });
 
     if (entriesToEvict.length > 0) {
-      console.log(`清理了 ${entriesToEvict.length} 个过期缓存条目`);
+      logger.log(`清理了 ${entriesToEvict.length} 个过期缓存条目`);
     }
   }
 
@@ -411,9 +404,9 @@ export class CacheManager {
         this.cache.set(item.key, entry);
       }
 
-      console.log(`导入了 ${parsed.entries.length} 个缓存条目`);
+      logger.log(`导入了 ${parsed.entries.length} 个缓存条目`);
     } catch (error) {
-      console.error("导入缓存失败:", error);
+      logger.error("导入缓存失败:", error);
     }
   }
 }

@@ -227,7 +227,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<Emits>();
 
 // Quasar 插件
-const {} = useQuasar();
+useQuasar();
 
 // 使用文件上传 Composable
 const {

@@ -2,6 +2,9 @@
 
 import { ProcessImageConfig } from "./../utils/ImageProcessor";
 import { ImageRenderer } from "../utils/ImageRenderer";
+import {
+  COMPRESSION_CONFIG,
+} from "../utils/CompressionLogic";
 
 class ImageWorker {
   private canvas: OffscreenCanvas | null = null;
@@ -61,6 +64,7 @@ class ImageWorker {
         targetHeight,
       );
 
+      // 使用共享压缩逻辑模块
       const optimizedDataUrl = await this.optimizeImageQuality(
         config.maxFileSize,
       );
@@ -107,25 +111,35 @@ class ImageWorker {
     );
   }
 
-  private async optimizeImageQuality(maxFileSize: number): Promise<string> {
+  /**
+   * 使用共享压缩逻辑优化图像质量
+   * 注意：OffscreenCanvas 使用 convertToBlob 而非 toDataURL
+   */
+  private async optimizeImageQuality(
+    maxFileSize: number,
+  ): Promise<string> {
     if (!this.canvas) throw new Error("Canvas not initialized");
-    const maxSizeBytes = maxFileSize * 1024;
-    let quality = 0.9;
 
+    // OffscreenCanvas 使用 convertToBlob，然后转换为 DataURL
+    const maxSizeBytes = maxFileSize * 1024;
+    let quality = COMPRESSION_CONFIG.INITIAL_QUALITY;
+
+    // 尝试初始质量
     let blob = await this.canvas.convertToBlob({
       type: "image/jpeg",
       quality: quality,
     });
 
     if (blob.size <= maxSizeBytes) {
-      return await this.blobToDataUrl(blob);
+      return this.blobToDataUrl(blob);
     }
 
-    let minQuality = 0.01;
-    let maxQuality = 0.9;
+    // 二分查找优化
+    let minQuality = COMPRESSION_CONFIG.MIN_QUALITY;
+    let maxQuality = COMPRESSION_CONFIG.INITIAL_QUALITY;
     let bestBlob: Blob | null = null;
 
-    while (maxQuality - minQuality > 0.005) {
+    while (maxQuality - minQuality > COMPRESSION_CONFIG.QUALITY_STEP) {
       quality = (minQuality + maxQuality) / 2;
       blob = await this.canvas.convertToBlob({
         type: "image/jpeg",
@@ -141,14 +155,15 @@ class ImageWorker {
     }
 
     if (bestBlob && bestBlob.size <= maxSizeBytes) {
-      return await this.blobToDataUrl(bestBlob);
+      return this.blobToDataUrl(bestBlob);
     }
 
+    // 最终降级
     blob = await this.canvas.convertToBlob({
       type: "image/jpeg",
-      quality: 0.01,
+      quality: COMPRESSION_CONFIG.MIN_QUALITY,
     });
-    return await this.blobToDataUrl(blob);
+    return this.blobToDataUrl(blob);
   }
 
   private async blobToDataUrl(blob: Blob): Promise<string> {

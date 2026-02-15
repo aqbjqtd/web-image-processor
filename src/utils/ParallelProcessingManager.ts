@@ -1,5 +1,6 @@
 import { ProcessImageConfig, ProcessedImage } from "./ImageProcessor";
 import { CacheManager } from "./CacheManager";
+import { logger } from "./logger";
 
 /**
  * 并行处理配置
@@ -105,7 +106,7 @@ export class ParallelProcessingManager {
     targetHeight: number,
   ): Promise<TaskResult> {
     return new Promise((resolve, reject) => {
-      const taskId = this.generateTaskId(file.name, config);
+      this.generateTaskId(file.name, config);
 
       this.taskQueue.push({
         file,
@@ -136,7 +137,7 @@ export class ParallelProcessingManager {
     this.state.isProcessing = true;
     this.state.totalTasks = files.length;
 
-    console.log(
+    logger.log(
       `开始并行处理 ${files.length} 个文件，并发数: ${this.config.maxConcurrency}`,
     );
 
@@ -150,11 +151,11 @@ export class ParallelProcessingManager {
       );
 
       if (cachedResult) {
-        console.log(`缓存命中: ${file.name}`);
+        logger.log(`缓存命中: ${file.name}`);
         this.processingHistory.set(file.name, Date.now());
         this.completedTasks.add(file.name);
         this.state.completedTasks++;
-        console.log(`缓存任务完成: ${file.name}`);
+        logger.log(`缓存任务完成: ${file.name}`);
         return null;
       }
 
@@ -163,14 +164,14 @@ export class ParallelProcessingManager {
         config,
         targetWidth,
         targetHeight,
-        resolve: (_result: TaskResult) => {
+        resolve: () => {
           this.completedTasks.add(file.name);
           this.state.completedTasks++;
-          console.log(`任务完成: ${file.name}`);
+          logger.log(`任务完成: ${file.name}`);
         },
         reject: (error: Error) => {
           this.state.failedTasks++;
-          console.error(`任务失败: ${file.name}:`, error);
+          logger.error(`任务失败: ${file.name}:`, error);
         },
         retryCount: 0,
       };
@@ -182,7 +183,7 @@ export class ParallelProcessingManager {
     );
 
     if (uncachedTasks.length === 0) {
-      console.log("所有文件都已在缓存中");
+      logger.log("所有文件都已在缓存中");
       return [];
     }
 
@@ -214,7 +215,7 @@ export class ParallelProcessingManager {
     const semaphore = new Semaphore(this.config.maxConcurrency);
 
     // 创建所有任务Promise
-    const taskPromises = tasks.map(async (task, index) => {
+    const taskPromises = tasks.map(async (task, _index) => {
       try {
         // 等待信号量
         await semaphore.acquire();
@@ -223,7 +224,7 @@ export class ParallelProcessingManager {
 
         // 检查任务是否已完成
         if (this.completedTasks.has(task.file.name)) {
-          console.log(`任务 ${task.file.name} 已完成，跳过`);
+          logger.log(`任务 ${task.file.name} 已完成，跳过`);
           return;
         }
 
@@ -264,12 +265,12 @@ export class ParallelProcessingManager {
         results.push(result.value);
       } else {
         // 任务失败，记录错误
-        console.error(`任务失败: ${task.file.name}`, result);
+        logger.error(`任务失败: ${task.file.name}`, result);
         this.state.failedTasks++;
 
         // 检查是否需要重试
         if (task.retryCount < this.config.retryAttempts) {
-          console.log(
+          logger.log(
             `重试任务: ${task.file.name} (${task.retryCount + 1}/${this.config.retryAttempts})`,
           );
 
@@ -306,7 +307,7 @@ export class ParallelProcessingManager {
       // 设置超时
       if (this.config.taskTimeout > 0) {
         task.timeout = setTimeout(() => {
-          console.warn(`任务超时: ${task.file.name}`);
+          logger.warn(`任务超时: ${task.file.name}`);
         }, this.config.taskTimeout);
       }
 
@@ -351,10 +352,10 @@ export class ParallelProcessingManager {
     const memoryInfo = this.getMemoryInfo();
 
     if (memoryInfo.usedJSHeapSize > memoryInfo.totalJSHeapSize * 0.8) {
-      console.warn(
+      logger.warn(
         `内存使用率较高: ${(memoryInfo.usedJSHeapSize / memoryInfo.totalJSHeapSize) * 100}%`,
       );
-      console.warn("建议减少并发数或启用更积极的缓存清理策略");
+      logger.warn("建议减少并发数或启用更积极的缓存清理策略");
 
       // 可以触发更积极的清理
       this.cacheManager.optimize();
@@ -406,7 +407,7 @@ export class ParallelProcessingManager {
    */
   pause(): void {
     this.state.isPaused = true;
-    console.log("处理已暂停");
+    logger.log("处理已暂停");
   }
 
   /**
@@ -414,7 +415,7 @@ export class ParallelProcessingManager {
    */
   resume(): void {
     this.state.isPaused = false;
-    console.log("处理已恢复");
+    logger.log("处理已恢复");
     this.processQueue();
   }
 
@@ -437,7 +438,7 @@ export class ParallelProcessingManager {
     this.completedTasks.clear();
     this.processingHistory.clear();
 
-    console.log("处理已停止");
+    logger.log("处理已停止");
   }
 
   /**
@@ -513,7 +514,7 @@ export class ParallelProcessingManager {
           task.reject(new Error(result.error || "Unknown error"));
         }
       } catch (error) {
-        console.error(`任务执行失败: ${task.file.name}`, error);
+        logger.error(`任务执行失败: ${task.file.name}`, error);
         this.state.failedTasks++;
         task.reject(error as Error);
       } finally {
